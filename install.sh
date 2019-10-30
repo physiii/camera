@@ -106,7 +106,7 @@ sudo modprobe v4l2loopback video_nr=10
 
 cd /usr/local/src
 git clone https://github.com/physiii/camera
-cd gateway
+cd camera
 npm install
 sudo chmod -R 777 /usr/local/lib /etc/wpa_supplicant/wpa_supplicant.conf /etc/hostapd/hostapd.conf
 
