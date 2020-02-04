@@ -93,8 +93,8 @@ sudo chown -R $USER /usr/src
 cd /usr/src
 git clone https://github.com/umlaeute/v4l2loopback
 cd v4l2loopback
-sudo make -j4 KERNELRELEASE=4.19.66-v7l+
-sudo make install KERNELRELEASE=4.19.66-v7l+
+sudo make -j4 KERNELRELEASE=4.19.93-v7l+
+sudo make install KERNELRELEASE=4.19.93-v7l+
 sudo depmod -a
 sudo modprobe v4l2loopback video_nr=10
 
@@ -114,6 +114,6 @@ sudo chmod -R 777 /usr/local/lib /etc/wpa_supplicant/wpa_supplicant.conf /etc/ho
 
 sudo -i
 sed -i -e 's/exit 0//g' /etc/rc.local
-echo "su pi -c 'pm2 start ${HOME}/camera/index.js --name camera'" >> /etc/rc.local
+echo "su pi -c 'pm2 start "${HOME}"/camera/index.js --name camera'" >> /etc/rc.local
 echo "modprobe v4l2loopback video_nr=10" >> /etc/rc.local
 echo "exit 0" >> /etc/rc.local
