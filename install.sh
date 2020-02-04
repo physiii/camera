@@ -12,11 +12,11 @@ curl -sL https://deb.nodesource.com/setup_13.x | sudo -E bash -
 sudo apt-get install -y \
   sshpass git nodejs mongodb dnsmasq hostapd tmux xdotool libudev-dev \
   python-pip python-setuptools python-dev python2.7-dev python-opencv \
-  libssl-dev libasound2-dev raspberrypi-kernel-headers nmap \
+  libssl-dev libasound2-dev raspberrypi-kernel-headers nmap ffmpeg \
   build-essential cmake pkg-config libjpeg-dev libtiff5-dev libjasper-dev \
   libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libfreetype6-dev \
   libatlas-base-dev gfortran python3-dev libavcodec-dev libavformat-dev \
-  v4l2loopback-dkms v4l2loopback-utils \
+  #v4l2loopback-dkms v4l2loopback-utils \
 
 sudo pip install pymongo==3.0.3 numpy imutils
 sudo npm install -g pm2
