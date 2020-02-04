@@ -4,12 +4,10 @@
 ## general ##
 #############
 
-sudo chmod -R 777 /usr/local/src
-
 sudo apt update && sudo apt upgrade -y
 
 sudo apt-get install -y curl
-curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+curl -sL https://deb.nodesource.com/setup_13.x | sudo -E bash -
 
 sudo apt-get install -y \
   sshpass git nodejs mongodb dnsmasq hostapd tmux xdotool libudev-dev \
@@ -27,7 +25,7 @@ sudo npm install -g pm2
 ##  ffmpeg  ##
 ##############
 
-cd /usr/local/src
+cd ${HOME}
 git clone https://github.com/FFmpeg/FFmpeg.git
 cd FFmpeg
 sudo ./configure --arch=armel --target-os=linux --enable-libfreetype --enable-openssl --enable-gpl --enable-libx264 --enable-nonfree
@@ -47,19 +45,19 @@ sudo make install
 #sudo mv /usr/lib/python2.7/dist-packages/cv2.arm-linux-gnueabihf.so /usr/lib/python2.7/dist-packages/cv2.arm-linux-gnueabihf-ORIG.so 
 #sudo ln -s /usr/local/src/opencv-4.0.0/build/lib/cv2.so /usr/lib/python2.7/dist-packages/cv2.arm-linux-gnueabihf.so
 
-cd /usr/local/src
-wget -O opencv.zip https://github.com/opencv/opencv/archive/4.1.0.zip
-wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/4.1.0.zip
+cd ${HOME}
+wget -O opencv.zip https://github.com/opencv/opencv/archive/4.2.0.zip
+wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/4.2.0.zip
 unzip opencv.zip
 unzip opencv_contrib.zip
 
-cd opencv-4.1.0
+cd opencv-4.2.0
 mkdir build
 cd build
 
 cmake -D CMAKE_BUILD_TYPE=RELEASE \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
-    -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-4.1.0/modules \
+    -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-4.2.0/modules \
     -D ENABLE_NEON=ON \
     -D ENABLE_VFPV3=ON \
     -D BUILD_TESTS=OFF \
@@ -100,11 +98,11 @@ sudo make install KERNELRELEASE=4.19.66-v7l+
 sudo depmod -a
 sudo modprobe v4l2loopback video_nr=10
 
-###############
-##  gateway  ##
-###############
+##############
+##  camera  ##
+##############
 
-cd /usr/local/src
+cd ${HOME}
 git clone https://github.com/physiii/camera
 cd camera
 npm install
@@ -116,6 +114,6 @@ sudo chmod -R 777 /usr/local/lib /etc/wpa_supplicant/wpa_supplicant.conf /etc/ho
 
 sudo -i
 sed -i -e 's/exit 0//g' /etc/rc.local
-echo "su pi -c 'pm2 start /usr/local/src/gateway/index.js --name gateway'" >> /etc/rc.local
+echo "su pi -c 'pm2 start /usr/local/src/camera/index.js --name camera'" >> /etc/rc.local
 echo "modprobe v4l2loopback video_nr=10" >> /etc/rc.local
 echo "exit 0" >> /etc/rc.local
