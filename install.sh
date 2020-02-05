@@ -12,10 +12,11 @@ curl -sL https://deb.nodesource.com/setup_13.x | sudo -E bash -
 sudo apt-get install -y \
   sshpass git nodejs mongodb dnsmasq hostapd tmux xdotool libudev-dev \
   python-pip python-setuptools python-dev python2.7-dev python-opencv \
-  libssl-dev libasound2-dev raspberrypi-kernel-headers nmap ffmpeg \
-  build-essential cmake pkg-config libjpeg-dev libtiff5-dev libjasper-dev \
+  libssl-dev libasound2-dev nmap ffmpeg \
+  build-essential cmake pkg-config libjpeg-dev libtiff5-dev \
   libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libfreetype6-dev \
   libatlas-base-dev gfortran python3-dev libavcodec-dev libavformat-dev \
+  raspberrypi-kernel-headers libjasper-dev \ # Pi Specific
   #v4l2loopback-dkms v4l2loopback-utils \
 
 sudo pip install pymongo==3.0.3 numpy imutils
@@ -58,8 +59,8 @@ cd build
 cmake -D CMAKE_BUILD_TYPE=RELEASE \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
     -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-4.2.0/modules \
-    -D ENABLE_NEON=ON \
-    -D ENABLE_VFPV3=ON \
+    -D ENABLE_NEON=ON \ # Pi Specific
+    -D ENABLE_VFPV3=ON \ # Pi Specific
     -D BUILD_TESTS=OFF \
     -D OPENCV_ENABLE_NONFREE=ON \
     -D INSTALL_PYTHON_EXAMPLES=OFF \
