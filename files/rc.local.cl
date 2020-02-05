@@ -13,7 +13,7 @@
 
 
 
-su pi -c 'pm2 start /usr/local/src/gateway/index.js --name gateway'
+su pi -c 'pm2 start /home/pi/camera/index.js --name camera'
 modprobe v4l2loopback video_nr=10,20
 
 
