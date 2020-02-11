@@ -11,7 +11,7 @@ const spawn = require('child_process').spawn,
 	VideoStreamer = require('../video-streamer.js'),
 	CameraRecordings = require('../camera-recordings.js'),
 	motionScriptPath = path.join(__dirname, '/../motion/motion.py'),
-	mediaDir = "/usr/local/lib/gateway/",
+	mediaDir = "/usr/local/lib/camera/",
 	ONE_DAY_IN_HOURS = 24,
 	ONE_HOUR_IN_MINUTES = 60,
 	ONE_MINUTE_IN_SECONDS = 60,
@@ -186,7 +186,7 @@ class CameraService extends Service {
 				console.log(METHOD_TAG, 'Starting motion detection.');
 
 				// Launch the motion detection script.
-				const motionProcess = spawn('python', [
+				const motionProcess = spawn('python3', [
 					motionScriptPath,
 					'--camera', this.getLoopbackDevicePath(),
 					'--camera-id', this.id,

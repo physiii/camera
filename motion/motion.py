@@ -31,8 +31,8 @@ ymin = 100
 xmax = xmin + rWidth
 ymax = ymin + rHeight
 
-FRAMERATE = 16
-BUFFER_SIZE = 3 * FRAMERATE # seconds * framerate
+FRAMERATE = 24
+BUFFER_SIZE = 20 * FRAMERATE # seconds * framerate
 MIN_MOTION_FRAMES = 16 # minimum number of consecutive frames with motion required to trigger motion detection
 MAX_CATCH_UP_FRAMES = 30 # maximum number of consecutive catch-up frames before forcing evaluation of a new frame
 MAX_CATCH_UP_MAX_REACHED = 10 # script will exit if max catch up frames limit is reached this many times consecutively
@@ -77,7 +77,7 @@ def getCameraFolderName():
   return cameraId
 
 def getEventsPath():
-  basePath = createFolderIfNotExists('/usr/local/lib/gateway')
+  basePath = createFolderIfNotExists('/usr/local/lib/camera')
 
   return createFolderIfNotExists(basePath + '/events')
 
@@ -223,7 +223,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
   # continue
   # resize the frame, convert it to grayscale, and blur it
   gray = cv2.cvtColor(imutils.resize(frame, width=200), cv2.COLOR_BGR2GRAY)
-  # gray = cv2.GaussianBlur(gray, (21, 21), 0)
+  gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
   # if the first frame is None, initialize it
   if avg is None:
@@ -232,7 +232,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
   # accumulate the weighted average between the current frame and
   # previous frames, then compute the difference between the current
   # frame and running average
-  cv2.accumulateWeighted(gray, avg, 0.2)
+  cv2.accumulateWeighted(gray, avg, 0.1)
   frameDelta = cv2.absdiff(gray, cv2.convertScaleAbs(avg))
   thresh = cv2.threshold(frameDelta, motionThreshold, 255, cv2.THRESH_BINARY)[1]
 
@@ -244,7 +244,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
   # determine if the there's motion in this frame
   for contour in contours:
     # if the contour is too small, ignore it
-    if cv2.contourArea(contour) < 5000:
+    if cv2.contourArea(contour) < 3000:
       continue
 
     # compute the bounding box for the contour
@@ -262,7 +262,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 
     # if we are not already recording, start recording
     if consecFramesWithMotion >= MIN_MOTION_FRAMES and not kcw.recording:
-      print '[MOTION] Detected motion. Threshold: ',motionThreshold
+      print('[MOTION] Detected motion. Threshold: ',motionThreshold)
 
       # save a preview image
       cv2.imwrite(getCameraPath() + '/preview.jpg', frame)
@@ -272,7 +272,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
       tempRecordingPath = getCameraTempPath() + '/' + fileName
       finishedRecordingPath = getDatePath(fileTimestamp) + '/' + fileName
 
-      kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'MJPG'), FRAMERATE)
+      kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
   else:
     consecFramesWithMotion = 0
     consecFramesWithoutMotion += 1
