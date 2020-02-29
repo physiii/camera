@@ -238,8 +238,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
   xh = int(motionArea_x2 * frame.shape[1])
 
   croppedFrame = frame[y: yh, x: xh].copy()
-  # frame = croppedFrame
-  cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
+  # cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
 
   # resize the frame, convert it to grayscale, and blur it
   gray = cv2.cvtColor(imutils.resize(croppedFrame, width=500), cv2.COLOR_BGR2GRAY)
