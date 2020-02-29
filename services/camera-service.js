@@ -43,6 +43,7 @@ class CameraService extends Service {
 		this.settings.timelapse_on_time_minute = data.settings && data.settings.timelapse_on_time_minute || 0;
 		this.settings.timelapse_off_time_hour = data.settings && data.settings.timelapse_off_time_hour || 22;
 		this.settings.timelapse_off_time_minute = data.settings && data.settings.timelapse_off_time_minute || 0;
+		this.settings.motionArea_x1 = data.settings && data.settings.motionArea_x1 || 0;
 
 		CameraRecordings.getLastRecording(this.id).then((recording) => this.state.motion_detected_date = recording ? recording.date : null);
 
@@ -183,7 +184,7 @@ class CameraService extends Service {
 		const METHOD_TAG = this.TAG + ' [motion]',
 			MOTION_TAG = METHOD_TAG + ' [motion.py]',
 			launchMotionScript = () => {
-				console.log(METHOD_TAG, 'Starting motion detection.');
+				console.log(METHOD_TAG, 'Starting motion detection.',JSON.stringify(this.settings));
 
 				// Launch the motion detection script.
 				const motionProcess = spawn('python3', [
@@ -191,7 +192,11 @@ class CameraService extends Service {
 					'--camera', this.getLoopbackDevicePath(),
 					'--camera-id', this.id,
 					'--rotation', this.settings.rotation || 0,
-					'--threshold', this.settings.motion_threshold || 10
+					'--threshold', this.settings.motion_threshold || 10,
+					'--motionArea_x1', this.settings.motionArea_x1 || 0,
+					'--motionArea_y1', this.settings.motionArea_y1 || 0,
+					'--motionArea_x2', this.settings.motionArea_x2 || 0,
+					'--motionArea_y2', this.settings.motionArea_y2 || 0,
 				]);
 
 				// Listen for motion events.
@@ -338,15 +343,6 @@ CameraService.settings_definitions = new Map([...Service.settings_definitions])
 		default_value: true,
 		validation: {is_required: false}
 	})
-	.set('motion_threshold', {
-		type: 'integer',
-		label: 'Motion Threshold',
-		default_value: 10,
-		validation: {
-			min: 0,
-			is_required: false
-		}
-	})
 	.set('should_take_timelapse', {
 		type: 'boolean',
 		label: 'Take Timelapse',
@@ -406,6 +402,63 @@ CameraService.settings_definitions = new Map([...Service.settings_definitions])
 	.set('timelapse_off_time_minute', {
 		type: 'integer',
 		label: 'Timelapse Off Time (minutes)',
+		default_value: 0,
+		validation: {
+			is_required: false,
+			min: 0,
+			max: 59
+		}
+	})
+	.set('motion_detection_enabled', {
+		type: 'boolean',
+		label: 'Motion Detection',
+		default_value: true,
+		validation: {
+			is_required: false
+		}
+	})
+	.set('motion_threshold', {
+		type: 'integer',
+		label: 'Motion Threshold',
+		default_value: 10,
+		validation: {
+			min: 0,
+			is_required: false
+		}
+	})
+	.set('motionArea_x1', {
+		type: 'decimal',
+		label: 'motion area value',
+		default_value: 0,
+		validation: {
+			is_required: false,
+			min: 0,
+			max: 59
+		}
+	})
+	.set('motionArea_y1', {
+		type: 'decimal',
+		label: 'motion area value',
+		default_value: 0,
+		validation: {
+			is_required: false,
+			min: 0,
+			max: 59
+		}
+	})
+	.set('motionArea_x2', {
+		type: 'decimal',
+		label: 'motion area value',
+		default_value: 0,
+		validation: {
+			is_required: false,
+			min: 0,
+			max: 59
+		}
+	})
+	.set('motionArea_y2', {
+		type: 'decimal',
+		label: 'motion area value',
 		default_value: 0,
 		validation: {
 			is_required: false,

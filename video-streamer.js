@@ -24,16 +24,13 @@ class VideoStreamer {
 		width = defaultWidth,
 		height = defaultHeight,
 		rotation = defaultRotation
-	} = {}) {
-		// ffmpeg -s 1280x720 -r 30 -f v4l2 -i /dev/video10 -f mpegts -vf transpose=2,transpose=1 -codec:a mp2 -ar 44100 -ac 1 -b:a 128k -codec:v mpeg1video -b:v 2000k -strict -1 http://dev.pyfi.org:8083/13eb0463-de12-4035-8ede-fb7ef6dce94f/f6596f274ddbab90493615c8293d939f5453b35c019978c5c271569e9363b747a289fa743d78fa04eabc868b9ae4499c376ae2b73f4c577f7bbeb28ef415d1c3c47d225d1956834da0f9117757ee060c82f3a2633488d9559e0d5bc5ec80985274c1a60d77a4571fbba9d4454307e5e3b5a84060d5412a58d63ee619c63dddb0/
+		} = {}) {
+		// ffmpeg -s 1280x720 -r 30 -f v4l2 -i /dev/video10 -f mpegts -vf transpose=2,transpose=1 -codec:a mp2 -ar 44100 -ac 1 -b:a 128k -codec:v mpeg1video -b:v 2000k -strict -1 test.avi
 		const options = [
 			'-f', 'v4l2',
 				'-r', '15',
 				'-s', width + 'x' + height,
 				'-i', videoDevice,
-			'-f', 'alsa',
-				'-ar', '44100',
-				'-i', 'hw:2',
 			'-f', 'mpegts',
 				'-vf', this.getRotationFromDegrees(rotation),
 				'-codec:v', 'mpeg1video',
@@ -41,24 +38,33 @@ class VideoStreamer {
 					'-b:v', '2000k',
 				'-codec:a', 'mp2',
 					'-b:a', '128k',
-				'-ac', '1',
 			'-muxdelay', '0.001',
 			'-strict', '-1',
 			this.getStreamUrl(streamId, streamToken)
 		];
 
-
 		// Enable audio on the stream if the audio device is provided or set in config.
 		if (audioDevice || config.device_hw) {
 			options.unshift(
 				'-f', 'alsa',
-				'-i', audioDevice || config.device_hw
+					'-ar', '44100',
+					// '-ac', '1',
+					'-i', audioDevice || config.device_hw
 			);
 		}
 
+		this.printFFmpegOptions(options);
 		this.stream(options, streamId);
 	}
 
+	printFFmpegOptions (options) {
+		let options_str = 'ffmpeg';
+		for (let i = 0; i < options.length; i++) {
+			options_str += ' ' + options[i];
+		}
+
+		console.log("ffmpeg: ", options_str);
+	}
 	streamFile (streamId, streamToken, file) {
 		this.stream([
 			'-re',

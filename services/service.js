@@ -53,7 +53,7 @@ class Service {
 				[property]: new_value
 			};
 
-			console.log(TAG, this.id, 'Saving new settings');
+			console.log(TAG, this.id, 'Saving new setting');
 
 			resolve({...this.settings});
 		});
@@ -86,7 +86,7 @@ class Service {
 
 			this.settings = settings;
 
-			console.log(TAG, this.id, 'Saving new settings');
+			console.log(TAG, this.id, 'Saving new settings',this.settings);
 
 			resolve({...settings});
 		});

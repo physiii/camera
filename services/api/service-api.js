@@ -20,8 +20,10 @@ class ServiceApi {
 			this.service.saveSetting(data.property, data.value).then(() => callback()).catch(callback);
 		});
 		this.on('settings', (data, callback) => {
-			this.service.saveSettings(data.settings).then(() => callback()).catch(callback);
-			exec("sleep 1;pm2 restart camera", (error, stdout, stderr) => {console.log(stdout)});
+			this.service.saveSettings(data.settings).then(() => {
+				callback();
+				exec("sleep 1;pm2 restart camera", (error, stdout, stderr) => {console.log(stdout)});
+			}).catch(callback);
 		});
 	}
 

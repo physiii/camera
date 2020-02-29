@@ -45,12 +45,20 @@ ap.add_argument('-c', '--camera', dest='camera', type=str, required=True, help='
 ap.add_argument('-i', '--camera-id', dest='camera-id', type=str, required=True, help='unique id of camera service')
 ap.add_argument('-r', '--rotation', dest='rotation', type=int, required=False, default=0, help='degrees of rotation for the picture - supported values: 0, 180')
 ap.add_argument('-t', '--threshold', dest='threshold', type=int, required=False, default=10, help='Threshold used to begin recording motion')
+ap.add_argument('-x1', '--motionArea_x1', dest='motionArea_x1', type=float, required=False, default=10, help='Coordinates for motion record region')
+ap.add_argument('-y1', '--motionArea_y1', dest='motionArea_y1', type=float, required=False, default=10, help='Coordinates for motion record region')
+ap.add_argument('-x2', '--motionArea_x2', dest='motionArea_x2', type=float, required=False, default=10, help='Coordinates for motion record region')
+ap.add_argument('-y2', '--motionArea_y2', dest='motionArea_y2', type=float, required=False, default=10, help='Coordinates for motion record region')
 args = vars(ap.parse_args())
 
 cameraPath = args['camera']
 cameraId = args['camera-id']
 cameraRotation = args['rotation']
 motionThreshold = args['threshold']
+motionArea_x1 = args['motionArea_x1']
+motionArea_y1 = args['motionArea_y1']
+motionArea_x2 = args['motionArea_x2']
+motionArea_y2 = args['motionArea_y2']
 
 ##################################################################################################################
 # Definitions and Classes
@@ -166,6 +174,7 @@ consecCatchUpFrames = 0
 consecCatchUpMaxReached = 0
 recordingFramesLength = 0
 frame = None
+croppedFrame = None
 avg = None
 regionDetect = False
 kcw = KeyClipWriter(BUFFER_SIZE)
@@ -220,9 +229,20 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
   # rotate the frame
   if cameraRotation is 180:
     frame = imutils.rotate(frame, cameraRotation);
-  # continue
+
+  # crop image to motion area
+  # frame[y: y+h, x: x+w]
+  y = int(motionArea_y1 * frame.shape[0])
+  yh = int(motionArea_y2 * frame.shape[0])
+  x = int(motionArea_x1 * frame.shape[1])
+  xh = int(motionArea_x2 * frame.shape[1])
+
+  croppedFrame = frame[y: yh, x: xh].copy()
+  # frame = croppedFrame
+  cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
+
   # resize the frame, convert it to grayscale, and blur it
-  gray = cv2.cvtColor(imutils.resize(frame, width=200), cv2.COLOR_BGR2GRAY)
+  gray = cv2.cvtColor(imutils.resize(croppedFrame, width=500), cv2.COLOR_BGR2GRAY)
   gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
   # if the first frame is None, initialize it
@@ -244,7 +264,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
   # determine if the there's motion in this frame
   for contour in contours:
     # if the contour is too small, ignore it
-    if cv2.contourArea(contour) < 3000:
+    if cv2.contourArea(contour) < 1000:
       continue
 
     # compute the bounding box for the contour
