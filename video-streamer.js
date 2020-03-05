@@ -25,8 +25,9 @@ class VideoStreamer {
 		height = defaultHeight,
 		rotation = defaultRotation
 		} = {}) {
+
 		// ffmpeg -s 1280x720 -r 30 -f v4l2 -i /dev/video10 -f mpegts -vf transpose=2,transpose=1 -codec:a mp2 -ar 44100 -ac 1 -b:a 128k -codec:v mpeg1video -b:v 2000k -strict -1 test.avi
-		const options = [
+		let options = [
 			'-f', 'v4l2',
 				'-r', '15',
 				'-s', width + 'x' + height,
@@ -35,26 +36,33 @@ class VideoStreamer {
 				'-vf', this.getRotationFromDegrees(rotation),
 				'-codec:v', 'mpeg1video',
 					'-s', width + 'x' + height,
-					'-b:v', '2000k',
-				'-codec:a', 'mp2',
-					'-b:a', '128k',
-			'-muxdelay', '0.001',
+					'-b:v', '1000k',
+				'-muxdelay', '0.001',
 			'-strict', '-1',
 			this.getStreamUrl(streamId, streamToken)
 		];
 
-		// Enable audio on the stream if the audio device is provided or set in config.
-		if (audioDevice || config.device_hw) {
-			options.unshift(
-				'-f', 'alsa',
-					'-ar', '44100',
-					// '-ac', '1',
-					'-i', audioDevice || config.device_hw
-			);
-		}
-
 		this.printFFmpegOptions(options);
 		this.stream(options, streamId);
+
+		// Enable audio on the stream if the audio device is provided or set in config.
+		if (audioDevice || config.device_hw) {
+			options = [
+				'-f', 'alsa',
+					'-ar', '44100',
+					'-i', audioDevice || config.device_hw,
+				'-f', 'mpegts',
+					'-codec:a', 'mp2',
+						'-b:a', '128k',
+					'-muxdelay', '0.001',
+				'-strict', '-1',
+				this.getStreamUrl(streamId, streamToken)
+				];
+
+			this.printFFmpegOptions(options);
+			this.stream(options, streamId);
+		}
+
 	}
 
 	printFFmpegOptions (options) {

@@ -241,7 +241,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
   # cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
 
   # resize the frame, convert it to grayscale, and blur it
-  gray = cv2.cvtColor(imutils.resize(croppedFrame, width=500), cv2.COLOR_BGR2GRAY)
+  gray = cv2.cvtColor(imutils.resize(croppedFrame, width=100), cv2.COLOR_BGR2GRAY)
   gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
   # if the first frame is None, initialize it
