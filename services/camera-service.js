@@ -179,6 +179,22 @@ class CameraService extends Service {
 		VideoStreamer.stop(this.id);
 	}
 
+	streamLiveAudio () {
+		const stream_token = this.generateStreamToken();
+
+		VideoStreamer.streamLiveAudio(
+			this.id,
+			stream_token,
+			config.device_hw
+		);
+
+		return stream_token;
+	}
+
+	audioStreamStop () {
+		VideoStreamer.stop(this.id);
+	}
+
 	startMotionDetection () {
 		const METHOD_TAG = this.TAG + ' [motion]',
 			MOTION_TAG = METHOD_TAG + ' [motion.py]',

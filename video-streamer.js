@@ -44,13 +44,14 @@ class VideoStreamer {
 
 		this.printFFmpegOptions(options);
 		this.stream(options, streamId);
+	}
 
-		// Enable audio on the stream if the audio device is provided or set in config.
-		if (audioDevice || config.device_hw) {
-			options = [
+	streamLiveAudio (streamId, streamToken, audioDevice) {
+		let options = [
 				'-f', 'alsa',
 					'-ar', '44100',
-					'-i', audioDevice || config.device_hw,
+					// '-ac', '1',
+					'-i', audioDevice,
 				'-f', 'mpegts',
 					'-codec:a', 'mp2',
 						'-b:a', '128k',
@@ -59,10 +60,8 @@ class VideoStreamer {
 				this.getStreamUrl(streamId, streamToken)
 				];
 
-			this.printFFmpegOptions(options);
-			this.stream(options, streamId);
-		}
-
+		this.printFFmpegOptions(options);
+		this.stream(options, streamId);
 	}
 
 	printFFmpegOptions (options) {
