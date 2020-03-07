@@ -15,7 +15,7 @@ sudo apt-get install -y \
   libssl-dev libasound2-dev nmap ffmpeg \
   build-essential cmake pkg-config libjpeg-dev libtiff5-dev \
   libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libfreetype6-dev \
-  libatlas-base-dev gfortran python3-dev libavcodec-dev libavformat-dev libqtgui4 libqt4-test \
+  libatlas-base-dev gfortran python3-dev libavcodec-dev libavformat-dev libqtgui4 libqt4-test python3-pip \
   raspberrypi-kernel-headers libjasper-dev \ # Pi Specific
   #v4l2loopback-dkms v4l2loopback-utils \
 
