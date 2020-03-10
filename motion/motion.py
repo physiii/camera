@@ -31,9 +31,9 @@ ymin = 100
 xmax = xmin + rWidth
 ymax = ymin + rHeight
 
-FRAMERATE = 24
-BUFFER_SIZE = 20 * FRAMERATE # seconds * framerate
-MIN_MOTION_FRAMES = 16 # minimum number of consecutive frames with motion required to trigger motion detection
+FRAMERATE = 5
+BUFFER_SIZE = 10 * FRAMERATE # seconds * framerate
+MIN_MOTION_FRAMES = 5 # minimum number of consecutive frames with motion required to trigger motion detection
 MAX_CATCH_UP_FRAMES = 30 # maximum number of consecutive catch-up frames before forcing evaluation of a new frame
 MAX_CATCH_UP_MAX_REACHED = 10 # script will exit if max catch up frames limit is reached this many times consecutively
 
@@ -164,7 +164,7 @@ except:
 # initialize the video stream and allow the camera sensor to
 # warmup
 camera = VideoStream(src=cameraPath).start()
-time.sleep(2.5)
+time.sleep(1.5)
 
 # initialize key clip writer and the consecutive number of
 # frames that have *not* contained any action
@@ -177,6 +177,8 @@ frame = None
 croppedFrame = None
 avg = None
 regionDetect = False
+motionReported = False
+noMotionReported = True
 kcw = KeyClipWriter(BUFFER_SIZE)
 
 # keep looping
@@ -280,18 +282,20 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
     consecFramesWithMotion += 1
 
     # if we are not already recording, start recording
-    if consecFramesWithMotion >= MIN_MOTION_FRAMES and not kcw.recording:
+    if consecFramesWithMotion >= MIN_MOTION_FRAMES and not motionReported:
+      motionReported = True
+      noMotionReported = False
       print('[MOTION] Detected motion. Threshold: ',motionThreshold)
 
       # save a preview image
       cv2.imwrite(getCameraPath() + '/preview.jpg', frame)
 
-      fileTimestamp = frameTimestamp
-      fileName = getFileName(fileTimestamp)
-      tempRecordingPath = getCameraTempPath() + '/' + fileName
-      finishedRecordingPath = getDatePath(fileTimestamp) + '/' + fileName
-
-      kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
+      # fileTimestamp = frameTimestamp
+      # fileName = getFileName(fileTimestamp)
+      # tempRecordingPath = getCameraTempPath() + '/' + fileName
+      # finishedRecordingPath = getDatePath(fileTimestamp) + '/' + fileName
+      #
+      # kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
   else:
     consecFramesWithMotion = 0
     consecFramesWithoutMotion += 1
@@ -313,20 +317,22 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 
   kcw.update(frame)
 
-  if kcw.recording and consecFramesWithoutMotion >= BUFFER_SIZE:
+  if consecFramesWithoutMotion >= BUFFER_SIZE and not noMotionReported:
     print('[NO MOTION] Recording finished capturing.')
+    noMotionReported = True
+    motionReported = False
     sys.stdout.flush()
 
-    recordingData = {
-      'tempPath': tempRecordingPath,
-      'finishedPath': finishedRecordingPath,
-      'date': fileTimestamp,
-      'duration': float(recordingFramesLength + BUFFER_SIZE) / FRAMERATE,
-      'width': frame.shape[1],
-      'height': frame.shape[0]
-    }
+    # recordingData = {
+    #   'tempPath': tempRecordingPath,
+    #   'finishedPath': finishedRecordingPath,
+    #   'date': fileTimestamp,
+    #   'duration': float(recordingFramesLength + BUFFER_SIZE) / FRAMERATE,
+    #   'width': frame.shape[1],
+    #   'height': frame.shape[0]
+    # }
 
-    kcw.finish(saveRecording, recordingData)
+    # kcw.finish(saveRecording, recordingData)
 
     # create a new KeyClipWriter. the existing one continues saving the
     # recording in a separate thread

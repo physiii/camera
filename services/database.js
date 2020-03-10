@@ -127,7 +127,7 @@ class Database {
 
 	store_device (device) {
 	return this.connect((db, resolve, reject) => {
-		db.collection('devices').update({id: device.id}, {$set: device.dbSerialize()}, {upsert: true}, (error, record) => {
+		db.collection('devices').insertOne({id: device.id}, {$set: device.dbSerialize()}, {upsert: true}, (error, record) => {
 			db.close();
 
 			if (error) {
@@ -192,6 +192,22 @@ class Database {
 			resolve(result[0]);
 		});
 	});
+	}
+
+	set_camera_recording (data) {
+		return this.connect((db, resolve, reject) => {
+			db.collection('camera_recordings').insertOne(data, (error, record) => {
+				db.close();
+
+				if (error) {
+					console.error(TAG, 'set_camera_recording', error);
+					reject('Database error');
+					return;
+				}
+
+				resolve(record);
+			});
+		});
 	}
 
 	delete_camera_recording (recording_id) {

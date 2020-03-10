@@ -43,6 +43,10 @@ class CameraRecordings {
 		});
 	}
 
+	saveRecording (data) {
+		database.set_camera_recording(data);
+	}
+
 	streamRecording (recordingId, streamToken) {
 		return new Promise((resolve, reject) => {
 			this.getRecordingById(recordingId).then((recording) => {
