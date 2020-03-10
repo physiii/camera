@@ -127,7 +127,7 @@ class Database {
 
 	store_device (device) {
 	return this.connect((db, resolve, reject) => {
-		db.collection('devices').insertOne({id: device.id}, {$set: device.dbSerialize()}, {upsert: true}, (error, record) => {
+		db.collection('devices').update({id: device.id}, {$set: device.dbSerialize()}, {upsert: true}, (error, record) => {
 			db.close();
 
 			if (error) {
