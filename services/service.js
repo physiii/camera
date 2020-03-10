@@ -86,7 +86,7 @@ class Service {
 
 			this.settings = settings;
 
-			console.log(TAG, this.id, 'Saving new settings',this.settings);
+			console.log(TAG, this.id, 'Saving new settings');
 
 			resolve({...settings});
 		});
