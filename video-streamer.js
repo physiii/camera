@@ -78,7 +78,7 @@ class VideoStreamer {
 	 this.motionStartDate = date;
 	}
 
-	startCameraCapture (buffer_1, buffer_2, audioDevice_1, audioDevice_2, videoDevice, {
+	startCameraCapture (buffer_1, audioDevice_1, videoDevice, {
 		width = defaultWidth,
 		height = defaultHeight,
 		rotation = defaultRotation
@@ -102,66 +102,68 @@ class VideoStreamer {
 				buffer_1
 				];
 
-			let options_2 = [
-				'-y',
-				'-loglevel', 'panic',
-				'-f', 'v4l2',
-					'-r', '10',
-					'-s', width + 'x' + height,
-					'-i', videoDevice,
-				'-f', 'alsa',
-					'-ar', '44100',
-					// '-ac', '1',
-					'-i', audioDevice_2,
-					'-q:v', '0',
-				buffer_2
-				];
-
 		const METHOD_TAG = TAG + ' [Capture]',
 			resetCaptureBuff_1 = () => {
 				this.capture(options_1, buffer_1);
-			},
-			resetCaptureBuff_2 = () => {
-				this.capture(options_2, buffer_2);
-			};
+			}
 
 		resetCaptureBuff_1();
 
 		this.loopbackInterval = setInterval(() => {
+
 			if (this.isMotionDetected) {
-				console.log(METHOD_TAG, 'Motion Detected, continuing buffer 2.');
+				console.log(METHOD_TAG, 'Motion Detected, continuing buffer.');
 				this.recordingStarted = true;
 			} else {
 				if (this.recordingStarted) {
 					this.recordingStarted = false;
-					this.saveBuffer(buffer_2).then(() => {
-						console.log(METHOD_TAG, 'Finished motion recording, copying buffer 2.');
+					this.saveBuffer(buffer_1).then(() => {
+						console.log(METHOD_TAG, 'Finished motion recording, saving buffer.');
 					});
 				} else {
-					console.log(METHOD_TAG, 'No motion Detected, Re-filling buffer 1.');
+					console.log(METHOD_TAG, 'No motion Detected, Re-filling buffer.');
 					resetCaptureBuff_1();
-					setTimeout(() => {
-
-						if (this.isMotionDetected) {
-							console.log(METHOD_TAG, 'Motion Detected, continuing buffer 2.');
-							this.recordingStarted = true;
-						} else {
-							if (this.recordingStarted) {
-								this.recordingStarted = false;
-								this.saveBuffer(buffer_1).then(() => {
-									console.log(METHOD_TAG, 'Finished motion recording, copying buffer 1.');
-								});
-							} else {
-								console.log(METHOD_TAG, 'No motion Detected, Re-filling buffer 2.');
-								resetCaptureBuff_2();
-							}
-						}
-
-					}, BUFFER_DELAY / 2);
 				}
 			}
 		}, BUFFER_DELAY);
 	}
+
+	capture (command, captureId) {
+			this.stopCapture(captureId).then(() => {
+				console.log(TAG, 'Starting FFmpeg capture. Capture ID:', this.printFFmpegOptions(command));
+				const ffmpegProcess = spawn('ffmpeg', command);
+
+				ffmpegProcess.on('close', (code) => {
+					console.log(TAG, `FFmpeg exited with code ${code}. Stream ID:`, captureId);
+				});
+			});
+		}
+
+	stopCapture (captureId) {
+			return new Promise((resolve, reject) => {
+				utils.checkIfProcessIsRunning('ffmpeg', captureId).then((proccess_id) => {
+					if (!proccess_id) {
+						resolve();
+
+						// return;
+					} else {
+
+					// console.log(TAG, 'Stopping FFmpeg capture. Capture ID:', captureId);
+
+						exec('kill ' + proccess_id, (error, stdout, stderr) => {
+							if (error || stderr) {
+								console.error(TAG, 'Tried to kill existing FFmpeg process, but an error occurred.', error, stderr);
+								reject();
+
+								return;
+							}
+
+							resolve();
+						});
+				}
+				});
+			});
+		}
 
 	saveBuffer (buffer) {
 		return new Promise((resolve, reject) => {
@@ -211,6 +213,7 @@ class VideoStreamer {
 			});
 		});
 	}
+
 	streamLiveAudio (streamId, streamToken, audioDevice) {
 		let options = [
 				'-f', 'alsa',
@@ -227,27 +230,6 @@ class VideoStreamer {
 
 		this.printFFmpegOptions(options);
 		this.stream(options, streamId, this.audio_stream_token);
-	}
-
-	printFFmpegOptions (options) {
-		let options_str = 'ffmpeg';
-		for (let i = 0; i < options.length; i++) {
-			options_str += ' ' + options[i];
-		}
-
-		console.log(options_str);
-		return options_str;
-	}
-
-	capture (command, captureId) {
-		this.stopCapture(captureId).then(() => {
-			// console.log(TAG, 'Starting FFmpeg capture. Capture ID:', captureId);
-			const ffmpegProcess = spawn('ffmpeg', command);
-
-			ffmpegProcess.on('close', (code) => {
-				// console.log(TAG, `FFmpeg exited with code ${code}. Stream ID:`, captureId);
-			});
-		});
 	}
 
 	streamFile (streamId, streamToken, file) {
@@ -273,31 +255,6 @@ class VideoStreamer {
 
 			ffmpegProcess.on('close', (code) => {
 				console.log(TAG, `FFmpeg exited with code ${code}. Stream ID:`, streamId);
-			});
-		});
-	}
-
-	stopCapture (captureId) {
-		return new Promise((resolve, reject) => {
-			utils.checkIfProcessIsRunning('ffmpeg', captureId).then((proccess_id) => {
-				if (!proccess_id) {
-					resolve();
-
-					return;
-				}
-
-				// console.log(TAG, 'Stopping FFmpeg capture. Capture ID:', captureId);
-
-				exec('kill ' + proccess_id, (error, stdout, stderr) => {
-					if (error || stderr) {
-						console.error(TAG, 'Tried to kill existing FFmpeg process, but an error occurred.', error, stderr);
-						reject();
-
-						return;
-					}
-
-					resolve();
-				});
 			});
 		});
 	}
@@ -359,6 +316,7 @@ class VideoStreamer {
 		console.log(TAG,cmd);
 		return cmd;
 	}
+
 	getRecordPath () {
 		const date = this.motionStartDate,
 			dd = (date.getDate() < 10 ? '0' : '') + date.getDate(),
@@ -369,6 +327,16 @@ class VideoStreamer {
 		exec('mkdir -p ' + path);
 		console.log(path);
 		return path;
+	}
+
+	printFFmpegOptions (options) {
+		let options_str = 'ffmpeg';
+		for (let i = 0; i < options.length; i++) {
+			options_str += ' ' + options[i];
+		}
+
+		console.log(options_str);
+		return options_str;
 	}
 
 	getRotationFromDegrees (degree) {

@@ -285,8 +285,8 @@ class CameraService extends Service {
 		const METHOD_TAG = this.TAG + ' [Capture]',
 			launchCapture = () => {
 				VideoStreamer.startCameraCapture(
-					BUFF_1, BUFF_2,
-					config.capture_audio_hw_1, config.capture_audio_hw_2,
+					BUFF_1,
+					config.capture_audio_hw_1,
 					this.getLoopbackDevicePath(),
 					{
 						width: this.settings.resolution_w,
@@ -297,17 +297,6 @@ class CameraService extends Service {
 			};
 
 		launchCapture();
-
-		// Every so often, check to make sure video capture is still running.
-		this.loopbackInterval = setInterval(() => {
-			utils.checkIfProcessIsRunning('ffmpeg', 'capture').then((isCaptureRunning) => {
-				if (!isCaptureRunning) {
-					console.log(METHOD_TAG, 'Capture not running. Re-spawning.');
-
-					launchCapture();
-				}
-			});
-		}, CHECK_SCRIPTS_DELAY);
 	}
 
 	setUpLoopback () {
