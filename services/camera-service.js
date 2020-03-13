@@ -76,6 +76,10 @@ class CameraService extends Service {
 		return '/dev/video1' + this.getCameraNumber();
 	}
 
+	getLoopbackCaptureDevicePath () {
+		return '/dev/video2' + this.getCameraNumber();
+	}
+
 	startTimeLapse () {
 		setInterval(this.saveTimeLapseImage.bind(this),
 			this.settings.timelapse_interval * ONE_MINUTE_IN_MILLISECONDS);
@@ -287,7 +291,7 @@ class CameraService extends Service {
 				VideoStreamer.startCameraCapture(
 					BUFF_1,
 					config.capture_audio_hw_1,
-					this.getLoopbackDevicePath(),
+					this.getLoopbackCaptureDevicePath(),
 					{
 						width: this.settings.resolution_w,
 						height: this.settings.resolution_h,
@@ -310,7 +314,9 @@ class CameraService extends Service {
 							'-pix_fmt', 'rgb24',
 							'-i', this.os_device_path,
 							'-f', 'v4l2',
-							this.getLoopbackDevicePath()
+							this.getLoopbackDevicePath(),
+							'-f', 'v4l2',
+							this.getLoopbackCaptureDevicePath()
 						]);
 
 					ffmpegProcess.stdout.on('data', (data) => {

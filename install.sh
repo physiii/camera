@@ -116,5 +116,6 @@ sudo chmod -R 777 /usr/local/lib /etc/wpa_supplicant/wpa_supplicant.conf /etc/ho
 sudo -i
 sed -i -e 's/exit 0//g' /etc/rc.local
 echo "su pi -c 'pm2 start "${HOME}"/camera/index.js --name camera'" >> /etc/rc.local
+echo "modprobe snd-aloop enable=1,1,1 index=4,5,6" >> /etc/rc.local
 echo "modprobe v4l2loopback video_nr=10" >> /etc/rc.local
 echo "exit 0" >> /etc/rc.local

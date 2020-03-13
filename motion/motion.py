@@ -31,9 +31,9 @@ ymin = 100
 xmax = xmin + rWidth
 ymax = ymin + rHeight
 
-FRAMERATE = 5
+FRAMERATE = 1
 BUFFER_SIZE = 10 * FRAMERATE # seconds * framerate
-MIN_MOTION_FRAMES = 5 # minimum number of consecutive frames with motion required to trigger motion detection
+MIN_MOTION_FRAMES = 4 # minimum number of consecutive frames with motion required to trigger motion detection
 MAX_CATCH_UP_FRAMES = 30 # maximum number of consecutive catch-up frames before forcing evaluation of a new frame
 MAX_CATCH_UP_MAX_REACHED = 10 # script will exit if max catch up frames limit is reached this many times consecutively
 
