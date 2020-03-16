@@ -19,8 +19,6 @@ const spawn = require('child_process').spawn,
 	ONE_HOUR_IN_MILLISECONDS = 3600000,
 	ONE_MINUTE_IN_MILLISECONDS = 60000,
 	ONE_SECOND_IN_MILLISECONDS = 1000,
-	BUFF_1 = '/tmp/capture_buffer_1.avi',
-	BUFF_2 = '/tmp/capture_buffer_2.avi',
 	//TIME_LAPSE_INTERVAL = 60 * ONE_SECOND_IN_MILLISECONDS,
 	CHECK_SCRIPTS_DELAY = 30 * ONE_SECOND_IN_MILLISECONDS,
 	TAG = '[CameraService]';
@@ -50,16 +48,16 @@ class CameraService extends Service {
 		this.settings.timelapse_off_time_minute = data.settings && data.settings.timelapse_off_time_minute || 0;
 		this.settings.motionArea_x1 = data.settings && data.settings.motionArea_x1 || 0;
 
-		VideoStreamer.setId(this.id);
 		CameraRecordings.getLastRecording(this.id).then((recording) => this.state.motion_detected_date = recording ? recording.date : null);
 
-		this.setUpLoopback().then(() => {
-			this.setUpAudioLoopback().then(() => {
+		// this.setUpLoopback().then(() => {
+			// this.setUpAudioLoopback().then(() => {
 				setTimeout(() => {
 					this.setUpCapture();
-				}, 100);
-			})
-		});
+					VideoStreamer.setInfo(this.id, this.video_stream_token, this.audio_stream_token, this.getCameraPath(), this.getLoopbackCaptureDevicePath(), config.capture_audio_hw);
+				}, 500);
+			// })
+		// });
 
 		if (this.settings.should_detect_motion) {
 			this.startMotionDetection();
@@ -72,12 +70,16 @@ class CameraService extends Service {
 		return this.os_device_path.substr(this.os_device_path.length - 1);
 	}
 
+	getCameraPath () {
+		return '/dev/video' + this.getCameraNumber();
+	}
+
 	getLoopbackDevicePath () {
 		return '/dev/video1' + this.getCameraNumber();
 	}
 
 	getLoopbackCaptureDevicePath () {
-		return '/dev/video2' + this.getCameraNumber();
+		return '/dev/video1' + this.getCameraNumber();
 	}
 
 	startTimeLapse () {
@@ -176,35 +178,15 @@ class CameraService extends Service {
 	}
 
 	streamLive () {
-		this.video_stream_token = this.generateStreamToken();
-
-		VideoStreamer.streamLive(
-			this.id,
-			this.video_stream_token,
-			this.getLoopbackDevicePath(),
-			{
-				width: this.settings.resolution_w,
-				height: this.settings.resolution_h,
-				rotation: this.settings.rotation
-			}
-		);
-
+		VideoStreamer.streamLive();
 		return this.video_stream_token;
 	}
 
 	stopStream () {
-		VideoStreamer.stop(this.video_stream_token);
+		// VideoStreamer.stop(this.video_stream_token);
 	}
 
 	streamLiveAudio () {
-		this.audio_stream_token = this.generateStreamToken();
-
-		VideoStreamer.streamLiveAudio(
-			this.id,
-			this.audio_stream_token,
-			config.stream_audio_hw
-		);
-
 		return this.audio_stream_token;
 	}
 
@@ -289,8 +271,8 @@ class CameraService extends Service {
 		const METHOD_TAG = this.TAG + ' [Capture]',
 			launchCapture = () => {
 				VideoStreamer.startCameraCapture(
-					BUFF_1,
 					config.capture_audio_hw_1,
+					this.getCameraPath(),
 					this.getLoopbackCaptureDevicePath(),
 					{
 						width: this.settings.resolution_w,
