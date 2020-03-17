@@ -31,9 +31,9 @@ ymin = 100
 xmax = xmin + rWidth
 ymax = ymin + rHeight
 
-FRAMERATE = 4
-BUFFER_SIZE = 10 * FRAMERATE # seconds * framerate
-MIN_MOTION_FRAMES = 4 # minimum number of consecutive frames with motion required to trigger motion detection
+FRAMERATE = 24
+BUFFER_SIZE = 20 * FRAMERATE # seconds * framerate
+MIN_MOTION_FRAMES = 16 # minimum number of consecutive frames with motion required to trigger motion detection
 MAX_CATCH_UP_FRAMES = 30 # maximum number of consecutive catch-up frames before forcing evaluation of a new frame
 MAX_CATCH_UP_MAX_REACHED = 10 # script will exit if max catch up frames limit is reached this many times consecutively
 
@@ -62,6 +62,62 @@ motionArea_y2 = args['motionArea_y2']
 
 ##################################################################################################################
 # Definitions and Classes
+
+def detectMotion(frame, avg):
+  motionDetected = False
+  croppedFrame = None
+  avg = None
+
+  # crop image to motion area
+  # frame[y: y+h, x: x+w]
+  y = int(motionArea_y1 * frame.shape[0])
+  yh = int(motionArea_y2 * frame.shape[0])
+  x = int(motionArea_x1 * frame.shape[1])
+  xh = int(motionArea_x2 * frame.shape[1])
+
+  if y > 1 and yh > 1 and x > 1 and xh > 1:
+    croppedFrame = frame[y: yh, x: xh].copy()
+  else:
+    croppedFrame = frame
+  # cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
+
+  # resize the frame, convert it to grayscale, and blur it
+  gray = cv2.cvtColor(imutils.resize(croppedFrame, width=100), cv2.COLOR_BGR2GRAY)
+  gray = cv2.GaussianBlur(gray, (21, 21), 0)
+
+  # if the first frame is None, initialize it
+  if avg is None:
+    avg = gray.copy().astype('float')
+
+  # accumulate the weighted average between the current frame and
+  # previous frames, then compute the difference between the current
+  # frame and running average
+  cv2.accumulateWeighted(gray, avg, 0.1)
+  frameDelta = cv2.absdiff(gray, cv2.convertScaleAbs(avg))
+  thresh = cv2.threshold(frameDelta, motionThreshold, 255, cv2.THRESH_BINARY)[1]
+
+  # dilate the thresholded image to fill in holes, then find contours
+  # on thresholded image
+  thresh = cv2.dilate(thresh, None, iterations=2)
+  contours, heir = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+  # determine if the there's motion in this frame
+  for contour in contours:
+    # if the contour is too small, ignore it
+    if cv2.contourArea(contour) < 1000:
+      continue
+
+    # compute the bounding box for the contour
+    (x, y, w, h) = cv2.boundingRect(contour)
+
+    if regionDetect:
+      if y < ymax and x < xmax and x+w > xmin and y+h > ymin:
+        motionDetected = True
+    else:
+      motionDetected = True
+
+  print(motionDetected)
+  return motionDetected
 
 def percentage(percent, wholeNum):
   if wholeNum == 0:
@@ -164,7 +220,7 @@ except:
 # initialize the video stream and allow the camera sensor to
 # warmup
 camera = VideoStream(src=cameraPath).start()
-time.sleep(1.5)
+time.sleep(2.5)
 
 # initialize key clip writer and the consecutive number of
 # frames that have *not* contained any action
@@ -174,11 +230,7 @@ consecCatchUpFrames = 0
 consecCatchUpMaxReached = 0
 recordingFramesLength = 0
 frame = None
-croppedFrame = None
-avg = None
 regionDetect = False
-motionReported = False
-noMotionReported = True
 kcw = KeyClipWriter(BUFFER_SIZE)
 
 # keep looping
@@ -209,7 +261,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
     if consecCatchUpMaxReached >= MAX_CATCH_UP_MAX_REACHED and not kcw.recording:
       print('Cannot process frames fast enough for motion detection. Exiting.')
       sys.stdout.flush()
-      sys.exit()
+      # sys.exit()
 
     print('Reached maximum number of catch-up frames (' + str(MAX_CATCH_UP_FRAMES) + '). Forcing evaluation of new frame from camera.')
     sys.stdout.flush()
@@ -218,7 +270,6 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 
   consecCatchUpFrames = 0
 
-  motionDetected = False
   frameTimestamp = datetime.datetime.now()
 
   # grab the current frame
@@ -232,76 +283,25 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
   if cameraRotation is 180:
     frame = imutils.rotate(frame, cameraRotation);
 
-  # crop image to motion area
-  # frame[y: y+h, x: x+w]
-  y = int(motionArea_y1 * frame.shape[0])
-  yh = int(motionArea_y2 * frame.shape[0])
-  x = int(motionArea_x1 * frame.shape[1])
-  xh = int(motionArea_x2 * frame.shape[1])
-
-  croppedFrame = frame[y: yh, x: xh].copy()
-
-  if y > 1 and yh > 1 and x > 1 and xh > 1:
-    croppedFrame = frame[y: yh, x: xh].copy()
-  else:
-    croppedFrame = frame
-
-  # cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
-
-  # resize the frame, convert it to grayscale, and blur it
-  gray = cv2.cvtColor(imutils.resize(croppedFrame, width=100), cv2.COLOR_BGR2GRAY)
-  gray = cv2.GaussianBlur(gray, (21, 21), 0)
-
-  # if the first frame is None, initialize it
-  if avg is None:
-    avg = gray.copy().astype('float')
-
-  # accumulate the weighted average between the current frame and
-  # previous frames, then compute the difference between the current
-  # frame and running average
-  cv2.accumulateWeighted(gray, avg, 0.1)
-  frameDelta = cv2.absdiff(gray, cv2.convertScaleAbs(avg))
-  thresh = cv2.threshold(frameDelta, motionThreshold, 255, cv2.THRESH_BINARY)[1]
-
-  # dilate the thresholded image to fill in holes, then find contours
-  # on thresholded image
-  thresh = cv2.dilate(thresh, None, iterations=2)
-  contours, heir = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-  # determine if the there's motion in this frame
-  for contour in contours:
-    # if the contour is too small, ignore it
-    if cv2.contourArea(contour) < 1000:
-      continue
-
-    # compute the bounding box for the contour
-    (x, y, w, h) = cv2.boundingRect(contour)
-
-    if regionDetect:
-      if y < ymax and x < xmax and x+w > xmin and y+h > ymin:
-        motionDetected = True
-    else:
-      motionDetected = True
-
+  motionDetected = False
+  motionDetected = detectMotion(frame)
   if motionDetected:
     consecFramesWithoutMotion = 0
     consecFramesWithMotion += 1
 
     # if we are not already recording, start recording
-    if consecFramesWithMotion >= MIN_MOTION_FRAMES and not motionReported:
-      motionReported = True
-      noMotionReported = False
+    if consecFramesWithMotion >= MIN_MOTION_FRAMES and not kcw.recording:
       print('[MOTION] Detected motion. Threshold: ',motionThreshold)
 
       # save a preview image
       cv2.imwrite(getCameraPath() + '/preview.jpg', frame)
 
-      # fileTimestamp = frameTimestamp
-      # fileName = getFileName(fileTimestamp)
-      # tempRecordingPath = getCameraTempPath() + '/' + fileName
-      # finishedRecordingPath = getDatePath(fileTimestamp) + '/' + fileName
-      #
-      # kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
+      fileTimestamp = frameTimestamp
+      fileName = getFileName(fileTimestamp)
+      tempRecordingPath = getCameraTempPath() + '/' + fileName
+      finishedRecordingPath = getDatePath(fileTimestamp) + '/' + fileName
+
+      kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
   else:
     consecFramesWithMotion = 0
     consecFramesWithoutMotion += 1
@@ -323,22 +323,20 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 
   kcw.update(frame)
 
-  if consecFramesWithoutMotion >= BUFFER_SIZE and not noMotionReported:
+  if kcw.recording and consecFramesWithoutMotion >= BUFFER_SIZE:
     print('[NO MOTION] Recording finished capturing.')
-    noMotionReported = True
-    motionReported = False
     sys.stdout.flush()
 
-    # recordingData = {
-    #   'tempPath': tempRecordingPath,
-    #   'finishedPath': finishedRecordingPath,
-    #   'date': fileTimestamp,
-    #   'duration': float(recordingFramesLength + BUFFER_SIZE) / FRAMERATE,
-    #   'width': frame.shape[1],
-    #   'height': frame.shape[0]
-    # }
+    recordingData = {
+      'tempPath': tempRecordingPath,
+      'finishedPath': finishedRecordingPath,
+      'date': fileTimestamp,
+      'duration': float(recordingFramesLength + BUFFER_SIZE) / FRAMERATE,
+      'width': frame.shape[1],
+      'height': frame.shape[0]
+    }
 
-    # kcw.finish(saveRecording, recordingData)
+    kcw.finish(saveRecording, recordingData)
 
     # create a new KeyClipWriter. the existing one continues saving the
     # recording in a separate thread
