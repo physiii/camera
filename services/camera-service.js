@@ -239,7 +239,7 @@ class CameraService extends Service {
 		});
 
 		motionProcess.on('close', (code) => {
-			console.error(TAG, `Motion process exited with code ${code}. Stream ID:`, streamId);
+			console.error(TAG, `Motion process exited with code ${code}.`);
 		});
 
 		motionProcess.stderr.on('data', (data) => {

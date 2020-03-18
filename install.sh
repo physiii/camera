@@ -16,10 +16,11 @@ sudo apt-get install -y \
   build-essential cmake pkg-config libjpeg-dev libtiff5-dev \
   libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libfreetype6-dev \
   libatlas-base-dev gfortran python3-dev libavcodec-dev libavformat-dev libqtgui4 libqt4-test python3-pip \
+  libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0 \
   raspberrypi-kernel-headers libjasper-dev \ # Pi Specific
   #v4l2loopback-dkms v4l2loopback-utils \
 
-sudo pip3 install pymongo==3.0.3 numpy imutils
+sudo pip3 install pymongo==3.0.3 numpy imutils pyaudio
 sudo npm install -g pm2
 
 ##############
@@ -43,7 +44,7 @@ sudo make install
 # sudo /etc/init.d/dphys-swapfile stop
 # sudo /etc/init.d/dphys-swapfile start
 
-#sudo mv /usr/lib/python2.7/dist-packages/cv2.arm-linux-gnueabihf.so /usr/lib/python2.7/dist-packages/cv2.arm-linux-gnueabihf-ORIG.so 
+#sudo mv /usr/lib/python2.7/dist-packages/cv2.arm-linux-gnueabihf.so /usr/lib/python2.7/dist-packages/cv2.arm-linux-gnueabihf-ORIG.so
 #sudo ln -s /usr/local/src/opencv-4.0.0/build/lib/cv2.so /usr/lib/python2.7/dist-packages/cv2.arm-linux-gnueabihf.so
 
 cd ${HOME}

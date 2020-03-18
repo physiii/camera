@@ -12,10 +12,12 @@ import time
 import imutils
 import json
 import cv2
+import pyaudio
 import os
 import shutil
 import sys
 import uuid
+import wave
 
 from bson import BSON
 from bson import json_util
@@ -24,6 +26,9 @@ from pymongo import MongoClient
 from pprint import pprint
 from bson.objectid import ObjectId
 
+##################################################################################################################
+# Globals
+
 rHeight = 200
 rWidth = 300
 xmin = 0
@@ -31,11 +36,20 @@ ymin = 100
 xmax = xmin + rWidth
 ymax = ymin + rHeight
 
-FRAMERATE = 24
-BUFFER_SIZE = 20 * FRAMERATE # seconds * framerate
-MIN_MOTION_FRAMES = 16 # minimum number of consecutive frames with motion required to trigger motion detection
+BUFFER_TIME = 10
+FRAMERATE = 20
+BUFFER_SIZE = BUFFER_TIME * FRAMERATE # seconds * framerate
+MIN_MOTION_FRAMES = 15 # minimum number of consecutive frames with motion required to trigger motion detection
 MAX_CATCH_UP_FRAMES = 30 # maximum number of consecutive catch-up frames before forcing evaluation of a new frame
 MAX_CATCH_UP_MAX_REACHED = 10 # script will exit if max catch up frames limit is reached this many times consecutively
+
+AUDIO_FRAME_RATE = 42
+MAX_AUDIO_FRAMES = BUFFER_TIME * AUDIO_FRAME_RATE
+FORMAT = pyaudio.paInt16
+WIDTH = 2
+CHANNELS = 2
+RATE = 44100
+CHUNK = 1024
 
 ##################################################################################################################
 # Parse arguments
@@ -63,164 +77,194 @@ motionArea_y2 = args['motionArea_y2']
 ##################################################################################################################
 # Definitions and Classes
 
+def callback(in_data, frame_count, time_info, status):
+	if len(audioFrames) >= MAX_AUDIO_FRAMES and not kcw.recording:
+		audioFrames.pop(0)
+
+	audioFrames.append(in_data)
+	return (in_data, pyaudio.paContinue)
+
 def detectMotion(frame, avg):
-  motionDetected = False
-  croppedFrame = None
-  avg = None
+	motionDetected = False
+	croppedFrame = None
 
-  # crop image to motion area
-  # frame[y: y+h, x: x+w]
-  y = int(motionArea_y1 * frame.shape[0])
-  yh = int(motionArea_y2 * frame.shape[0])
-  x = int(motionArea_x1 * frame.shape[1])
-  xh = int(motionArea_x2 * frame.shape[1])
+	# crop image to motion area
+	# frame[y: y+h, x: x+w]
+	y = int(motionArea_y1 * frame.shape[0])
+	yh = int(motionArea_y2 * frame.shape[0])
+	x = int(motionArea_x1 * frame.shape[1])
+	xh = int(motionArea_x2 * frame.shape[1])
 
-  if y > 1 and yh > 1 and x > 1 and xh > 1:
-    croppedFrame = frame[y: yh, x: xh].copy()
-  else:
-    croppedFrame = frame
-  # cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
+	if y > 1 and yh > 1 and x > 1 and xh > 1:
+		croppedFrame = frame[y: yh, x: xh].copy()
+	else:
+		croppedFrame = frame
+	# cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
 
-  # resize the frame, convert it to grayscale, and blur it
-  gray = cv2.cvtColor(imutils.resize(croppedFrame, width=100), cv2.COLOR_BGR2GRAY)
-  gray = cv2.GaussianBlur(gray, (21, 21), 0)
+	# resize the frame, convert it to grayscale, and blur it
+	gray = cv2.cvtColor(imutils.resize(croppedFrame, width=100), cv2.COLOR_BGR2GRAY)
+	gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
-  # if the first frame is None, initialize it
-  if avg is None:
-    avg = gray.copy().astype('float')
+	# if the first frame is None, initialize it
+	if avg is None:
+		avg = gray.copy().astype('float')
 
-  # accumulate the weighted average between the current frame and
-  # previous frames, then compute the difference between the current
-  # frame and running average
-  cv2.accumulateWeighted(gray, avg, 0.1)
-  frameDelta = cv2.absdiff(gray, cv2.convertScaleAbs(avg))
-  thresh = cv2.threshold(frameDelta, motionThreshold, 255, cv2.THRESH_BINARY)[1]
+	# accumulate the weighted average between the current frame and
+	# previous frames, then compute the difference between the current
+	# frame and running average
+	cv2.accumulateWeighted(gray, avg, 0.1)
+	frameDelta = cv2.absdiff(gray, cv2.convertScaleAbs(avg))
+	thresh = cv2.threshold(frameDelta, motionThreshold, 255, cv2.THRESH_BINARY)[1]
 
-  # dilate the thresholded image to fill in holes, then find contours
-  # on thresholded image
-  thresh = cv2.dilate(thresh, None, iterations=2)
-  contours, heir = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+	# dilate the thresholded image to fill in holes, then find contours
+	# on thresholded image
+	thresh = cv2.dilate(thresh, None, iterations=2)
+	contours, heir = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-  # determine if the there's motion in this frame
-  for contour in contours:
-    # if the contour is too small, ignore it
-    if cv2.contourArea(contour) < 1000:
-      continue
+	# determine if the there's motion in this frame
+	for contour in contours:
+		# if the contour is too small, ignore it
+		if cv2.contourArea(contour) < 1000:
+			continue
 
-    # compute the bounding box for the contour
-    (x, y, w, h) = cv2.boundingRect(contour)
+		# compute the bounding box for the contour
+		(x, y, w, h) = cv2.boundingRect(contour)
 
-    if regionDetect:
-      if y < ymax and x < xmax and x+w > xmin and y+h > ymin:
-        motionDetected = True
-    else:
-      motionDetected = True
+		if regionDetect:
+			if y < ymax and x < xmax and x+w > xmin and y+h > ymin:
+				motionDetected = True
+		else:
+			motionDetected = True
 
-  print(motionDetected)
-  return motionDetected
+	return motionDetected, avg
 
 def percentage(percent, wholeNum):
-  if wholeNum == 0:
-    print('Bad value for max number')
-  elif percent >= wholeNum:
-    print('Percentage will return greater than a 100 percent value')
-  else:
-    percent = float(percent)
-    wholeNum = float(wholeNum)
-    return (percent * wholeNum) / 100.0
+	if wholeNum == 0:
+		print('Bad value for max number')
+	elif percent >= wholeNum:
+		print('Percentage will return greater than a 100 percent value')
+	else:
+		percent = float(percent)
+		wholeNum = float(wholeNum)
+		return (percent * wholeNum) / 100.0
 
 def getCameraNumber(camera):
-  return camera.replace('/dev/video', '')
+	return camera.replace('/dev/video', '')
 
 def createFolderIfNotExists(path):
-  if not os.path.exists(path):
-    os.mkdir(path)
-  return path
+	if not os.path.exists(path):
+		os.mkdir(path)
+	return path
 
 def getCameraFolderName():
-  return cameraId
+	return cameraId
 
 def getEventsPath():
-  basePath = createFolderIfNotExists('/usr/local/lib/camera')
+	basePath = createFolderIfNotExists('/usr/local/lib/camera')
 
-  return createFolderIfNotExists(basePath + '/events')
+	return createFolderIfNotExists(basePath + '/events')
 
 def getTempPath():
-  tempBasePath = createFolderIfNotExists('/tmp/open-automation-gateway')
+	tempBasePath = createFolderIfNotExists('/tmp/open-automation')
 
-  return createFolderIfNotExists(tempBasePath + '/events')
+	return createFolderIfNotExists(tempBasePath + '/events')
 
 def getCameraPath():
-  return createFolderIfNotExists(getEventsPath() + '/' + getCameraFolderName())
+	return createFolderIfNotExists(getEventsPath() + '/' + getCameraFolderName())
 
 def getCameraTempPath():
-  return createFolderIfNotExists(getTempPath() + '/' + getCameraFolderName())
+	return createFolderIfNotExists(getTempPath() + '/' + getCameraFolderName())
 
 def getDatePath(date):
-  cameraPath = getCameraPath()
-  yearPath = createFolderIfNotExists(cameraPath + '/' + date.strftime('%Y'))
-  monthPath = createFolderIfNotExists(yearPath + '/' + date.strftime('%m'))
-  datePath = createFolderIfNotExists(monthPath + '/' +  date.strftime('%d'))
+	cameraPath = getCameraPath()
+	yearPath = createFolderIfNotExists(cameraPath + '/' + date.strftime('%Y'))
+	monthPath = createFolderIfNotExists(yearPath + '/' + date.strftime('%m'))
+	datePath = createFolderIfNotExists(monthPath + '/' +	date.strftime('%d'))
 
-  return datePath
+	return datePath
 
 def getFileName(date):
-  return date.strftime('%Y-%m-%d_%I:%M:%S%p') + '.avi'
+	return date.strftime('%Y-%m-%d_%I:%M:%S%p')
 
 def framerateInterval(FRAMERATE):
-  interval = datetime.timedelta(seconds=float(1) / FRAMERATE)
-  nextFrameTargetTime = datetime.datetime.now()
+	interval = datetime.timedelta(seconds=float(1) / FRAMERATE)
+	nextFrameTargetTime = datetime.datetime.now()
 
-  while True:
-    nextFrameTargetTime += interval
-    secondsUntilNextFrame = (nextFrameTargetTime - datetime.datetime.now()).total_seconds()
-    needCatchUpFrame = secondsUntilNextFrame < 0
+	while True:
+		nextFrameTargetTime += interval
+		secondsUntilNextFrame = (nextFrameTargetTime - datetime.datetime.now()).total_seconds()
+		needCatchUpFrame = secondsUntilNextFrame < 0
 
-    if not needCatchUpFrame:
-      time.sleep(secondsUntilNextFrame)
+		if not needCatchUpFrame:
+			time.sleep(secondsUntilNextFrame)
 
-    yield needCatchUpFrame
+		yield needCatchUpFrame
 
 def localDateToUtc(date):
-  utcOffsetSec = time.altzone if time.localtime().tm_isdst else time.timezone
-  utcOffset = datetime.timedelta(seconds=utcOffsetSec)
-  return date + utcOffset;
+	utcOffsetSec = time.altzone if time.localtime().tm_isdst else time.timezone
+	utcOffset = datetime.timedelta(seconds=utcOffsetSec)
+	return date + utcOffset;
 
 def saveRecording(data):
-  db.camera_recordings.insert_one({
-    'id': str(uuid.uuid4()),
-    'camera_id': cameraId,
-    'file': data['finishedPath'],
-    'date': localDateToUtc(data['date']),
-    'duration': data['duration'],
-    'width': data['width'],
-    'height': data['height']
-  })
+	audioFilePath = getCameraTempPath() + '/' + getFileName(fileTimestamp) + '.wav'
+	print("Saving audio buffer to file", audioFilePath)
 
-  # move the file from the temporary location
-  os.rename(data['tempPath'], data['finishedPath'])
+	# stream.stop_stream()
 
-  print('[NEW RECORDING] Recording saved.')
-  sys.stdout.flush()
+	wf = wave.open(audioFilePath, 'wb')
+	wf.setnchannels(CHANNELS)
+	wf.setsampwidth(audio.get_sample_size(FORMAT))
+	wf.setframerate(RATE)
+	wf.writeframes(b''.join(audioFrames))
+	wf.close()
+
+	db.camera_recordings.insert_one({
+		'id': str(uuid.uuid4()),
+		'camera_id': cameraId,
+		'file': data['finishedPath'],
+		'date': localDateToUtc(data['date']),
+		'duration': data['duration'],
+		'width': data['width'],
+		'height': data['height']
+	})
+
+	# move the file from the temporary location
+	os.rename(data['tempPath'], data['finishedPath'])
+
+	print('[NEW RECORDING] Recording saved.')
+	sys.stdout.flush()
+	# stream.start_stream()
 
 ##################################################################################################################
 # Start MongoDB
 
 try:
-  connection = MongoClient('mongodb://localhost:27017')
-  print('Database connected')
-  db = connection.gateway
+	connection = MongoClient('mongodb://localhost:27017')
+	print('Database connected')
+	db = connection.gateway
 except:
-  print('Error: Unable to connect to database')
-  sys.stdout.flush()
-  connection = None
+	print('Error: Unable to connect to database')
+	sys.stdout.flush()
+	connection = None
 
 ##################################################################################################################
 
+#initialize the audio device and start streaming
+audio = pyaudio.PyAudio()
+stream = audio.open(format=audio.get_format_from_width(WIDTH),
+            channels=CHANNELS,
+            rate=RATE,
+            input=True,
+            output=True,
+            stream_callback=callback)
+
+audioFrames = []
+time.sleep(1)
+stream.start_stream()
 # initialize the video stream and allow the camera sensor to
 # warmup
 camera = VideoStream(src=cameraPath).start()
-time.sleep(2.5)
+time.sleep(1)
 
 # initialize key clip writer and the consecutive number of
 # frames that have *not* contained any action
@@ -230,119 +274,135 @@ consecCatchUpFrames = 0
 consecCatchUpMaxReached = 0
 recordingFramesLength = 0
 frame = None
+avg = None
+motionDetected = False
 regionDetect = False
 kcw = KeyClipWriter(BUFFER_SIZE)
+loopCnt = 0
+audio = pyaudio.PyAudio()
+fileTimestamp = None
+cnt = 0
 
 # keep looping
 for needCatchUpFrame in framerateInterval(FRAMERATE):
-  # repeat the last frame if motion detection isn't keeping up with the framerate
-  if needCatchUpFrame and consecCatchUpFrames < MAX_CATCH_UP_FRAMES:
-    consecCatchUpFrames += 1
 
-    kcw.update(frame)
+	# repeat the last frame if motion detection isn't keeping up with the framerate
+	if needCatchUpFrame and consecCatchUpFrames < MAX_CATCH_UP_FRAMES:
+		consecCatchUpFrames += 1
 
-    if motionDetected:
-      consecFramesWithMotion += 1
-    else:
-      consecFramesWithoutMotion += 1
+		kcw.update(frame)
 
-    if kcw.recording:
-      recordingFramesLength += 1
+		if motionDetected:
+			consecFramesWithMotion += 1
+		else:
+			consecFramesWithoutMotion += 1
 
-    continue
+		if kcw.recording:
+			recordingFramesLength += 1
 
-  # if too many catch-up frames have been needed, force getting a fresh frame from the camera
-  if consecCatchUpFrames >= MAX_CATCH_UP_FRAMES:
-    consecCatchUpMaxReached += 1
+		continue
 
-    # if motion detection is failing to keep up with the framerate for too
-    # long, terminate the script so the camera service can try starting
-    # motion detection again.
-    if consecCatchUpMaxReached >= MAX_CATCH_UP_MAX_REACHED and not kcw.recording:
-      print('Cannot process frames fast enough for motion detection. Exiting.')
-      sys.stdout.flush()
-      # sys.exit()
+	# if too many catch-up frames have been needed, force getting a fresh frame from the camera
+	if consecCatchUpFrames >= MAX_CATCH_UP_FRAMES:
+		consecCatchUpMaxReached += 1
 
-    print('Reached maximum number of catch-up frames (' + str(MAX_CATCH_UP_FRAMES) + '). Forcing evaluation of new frame from camera.')
-    sys.stdout.flush()
-  else:
-    consecCatchUpMaxReached = 0
+		# if motion detection is failing to keep up with the framerate for too
+		# long, terminate the script so the camera service can try starting
+		# motion detection again.
+		if consecCatchUpMaxReached >= MAX_CATCH_UP_MAX_REACHED and not kcw.recording:
+			print('Cannot process frames fast enough for motion detection. Exiting.')
+			sys.stdout.flush()
+			# sys.exit()
 
-  consecCatchUpFrames = 0
+		print('Reached maximum number of catch-up frames (' + str(MAX_CATCH_UP_FRAMES) + '). Forcing evaluation of new frame from camera.')
+		sys.stdout.flush()
+	else:
+		consecCatchUpMaxReached = 0
 
-  frameTimestamp = datetime.datetime.now()
+	consecCatchUpFrames = 0
 
-  # grab the current frame
-  frame = camera.read()
+	frameTimestamp = datetime.datetime.now()
 
-  # if a frame could not be grabbed, try again
-  if frame is None:
-    continue
+	# grab the current frame
+	frame = camera.read()
 
-  # rotate the frame
-  if cameraRotation is 180:
-    frame = imutils.rotate(frame, cameraRotation);
+	# if a frame could not be grabbed, try again
+	if frame is None:
+		continue
 
-  motionDetected = False
-  motionDetected = detectMotion(frame)
-  if motionDetected:
-    consecFramesWithoutMotion = 0
-    consecFramesWithMotion += 1
+	# rotate the frame
+	if cameraRotation is 180:
+		frame = imutils.rotate(frame, cameraRotation);
 
-    # if we are not already recording, start recording
-    if consecFramesWithMotion >= MIN_MOTION_FRAMES and not kcw.recording:
-      print('[MOTION] Detected motion. Threshold: ',motionThreshold)
+	if (loopCnt >= FRAMERATE):
+		loopCnt = 0
+	else:
+		loopCnt += 1
 
-      # save a preview image
-      cv2.imwrite(getCameraPath() + '/preview.jpg', frame)
 
-      fileTimestamp = frameTimestamp
-      fileName = getFileName(fileTimestamp)
-      tempRecordingPath = getCameraTempPath() + '/' + fileName
-      finishedRecordingPath = getDatePath(fileTimestamp) + '/' + fileName
+	if (loopCnt % 4 == 0):
+		motionDetected = False
+		motionDetected, avg = detectMotion(frame, avg)
 
-      kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
-  else:
-    consecFramesWithMotion = 0
-    consecFramesWithoutMotion += 1
+	if motionDetected:
+		consecFramesWithoutMotion = 0
+		consecFramesWithMotion += 1
 
-  if kcw.recording:
-    recordingFramesLength += 1
+		# if we are not already recording, start recording
+		if consecFramesWithMotion >= MIN_MOTION_FRAMES and not kcw.recording:
+			print('[MOTION] Detected motion. Threshold: ',motionThreshold)
 
-  # add frameTimestamp text to frame
-  # text shadow
-  cv2.putText(frame, frameTimestamp.strftime('%-m/%-d/%Y %-I:%M:%S %p'),
-    (11, frame.shape[0] - 9), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 4)
-  # text
-  cv2.putText(frame, frameTimestamp.strftime('%-m/%-d/%Y %-I:%M:%S %p'),
-    (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (60, 255, 60), 2)
+			# save a preview image
+			cv2.imwrite(getCameraPath() + '/preview.jpg', frame)
 
-  # Draw region detection area
-  if regionDetect:
-    cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
+			fileTimestamp = frameTimestamp
+			videoFileName = getFileName(fileTimestamp) + '.avi'
+			tempRecordingPath = getCameraTempPath() + '/' + videoFileName
+			finishedRecordingPath = getDatePath(fileTimestamp) + '/' + videoFileName
 
-  kcw.update(frame)
+			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
+	else:
+		consecFramesWithMotion = 0
+		consecFramesWithoutMotion += 1
 
-  if kcw.recording and consecFramesWithoutMotion >= BUFFER_SIZE:
-    print('[NO MOTION] Recording finished capturing.')
-    sys.stdout.flush()
+	if kcw.recording:
+		recordingFramesLength += 1
 
-    recordingData = {
-      'tempPath': tempRecordingPath,
-      'finishedPath': finishedRecordingPath,
-      'date': fileTimestamp,
-      'duration': float(recordingFramesLength + BUFFER_SIZE) / FRAMERATE,
-      'width': frame.shape[1],
-      'height': frame.shape[0]
-    }
+	# add frameTimestamp text to frame
+	# text shadow
+	cv2.putText(frame, frameTimestamp.strftime('%-m/%-d/%Y %-I:%M:%S %p'),
+		(11, frame.shape[0] - 9), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 4)
+	# text
+	cv2.putText(frame, frameTimestamp.strftime('%-m/%-d/%Y %-I:%M:%S %p'),
+		(10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (60, 255, 60), 2)
 
-    kcw.finish(saveRecording, recordingData)
+	# Draw region detection area
+	if regionDetect:
+		cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
 
-    # create a new KeyClipWriter. the existing one continues saving the
-    # recording in a separate thread
-    kcw = KeyClipWriter(BUFFER_SIZE)
+	kcw.update(frame)
 
-    recordingFramesLength = 0
+	if kcw.recording and consecFramesWithoutMotion >= BUFFER_SIZE:
+		print('[NO MOTION] Recording finished capturing.')
 
-  sys.stdout.flush()
-  continue
+		sys.stdout.flush()
+
+		recordingData = {
+			'tempPath': tempRecordingPath,
+			'finishedPath': finishedRecordingPath,
+			'date': fileTimestamp,
+			'duration': float(recordingFramesLength + BUFFER_SIZE) / FRAMERATE,
+			'width': frame.shape[1],
+			'height': frame.shape[0]
+		}
+
+		kcw.finish(saveRecording, recordingData)
+
+		# create a new KeyClipWriter. the existing one continues saving the
+		# recording in a separate thread
+		kcw = KeyClipWriter(BUFFER_SIZE)
+
+		recordingFramesLength = 0
+
+	sys.stdout.flush()
+	continue
