@@ -9,6 +9,7 @@ const spawn = require('child_process').spawn,
 	TAG = '[VideoStreamer]';
 
 let	audioStreamProcess,
+	fileStreamProcess,
 	videoStreamProcess;
 
 class VideoStreamer {
@@ -49,7 +50,7 @@ class VideoStreamer {
 
 		if (videoStreamProcess) videoStreamProcess.kill();
 		console.log(TAG, 'Starting audio stream stream. Stream ID:', streamId);
-		videoStreamProcess = spawn('ffmpeg', options);
+		videoStreamProcess = spawn('ffmpeg', options, {shell: true});
 
 		videoStreamProcess.on('close', (code) => {
 			console.log(TAG, `Audio stream exited with code ${code}. Stream ID:`, streamId);
@@ -90,15 +91,28 @@ class VideoStreamer {
 		console.log("ffmpeg: ", options_str);
 	}
 	streamFile (streamId, streamToken, file) {
-		this.stream([
+
+		let options = [
 			'-re',
 			'-i', file,
 			'-f', 'mpegts',
 			'-codec:v', 'mpeg1video',
 			'-b:v', '1200k',
 			'-strict', '-1',
+			'-an',
 			this.getStreamUrl(streamId, streamToken)
-		], streamId);
+		];
+
+		this.printFFmpegOptions(options);
+
+		if (fileStreamProcess) fileStreamProcess.kill();
+		console.log(TAG, 'Starting file stream stream. Stream ID:', streamId);
+		fileStreamProcess = spawn('ffmpeg', options);
+
+		fileStreamProcess.on('close', (code) => {
+			console.log(TAG, `File stream exited with code ${code}. Stream ID:`, streamId);
+		});
+
 	}
 
 	streamFiles (streamId, streamToken, files) {
@@ -108,6 +122,7 @@ class VideoStreamer {
 	stop (process) {
 		if (audioStreamProcess) audioStreamProcess.kill();
 		if (videoStreamProcess) videoStreamProcess.kill();
+		if (fileStreamProcess) videoStreamProcess.kill();
 	}
 
 	getRotationFromDegrees (degree) {

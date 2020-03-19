@@ -18,6 +18,8 @@ import shutil
 import sys
 import uuid
 import wave
+import os
+import subprocess
 
 from bson import BSON
 from bson import json_util
@@ -43,8 +45,7 @@ MIN_MOTION_FRAMES = 15 # minimum number of consecutive frames with motion requir
 MAX_CATCH_UP_FRAMES = 30 # maximum number of consecutive catch-up frames before forcing evaluation of a new frame
 MAX_CATCH_UP_MAX_REACHED = 10 # script will exit if max catch up frames limit is reached this many times consecutively
 
-AUDIO_FRAME_RATE = 42
-MAX_AUDIO_FRAMES = BUFFER_TIME * AUDIO_FRAME_RATE
+AUDIO_BUFFER = 41.7 * BUFFER_TIME
 FORMAT = pyaudio.paInt16
 WIDTH = 2
 CHANNELS = 2
@@ -78,7 +79,7 @@ motionArea_y2 = args['motionArea_y2']
 # Definitions and Classes
 
 def callback(in_data, frame_count, time_info, status):
-	if len(audioFrames) >= MAX_AUDIO_FRAMES and not kcw.recording:
+	if len(audioFrames) >= AUDIO_BUFFER and not kcw.recording:
 		audioFrames.pop(0)
 
 	audioFrames.append(in_data)
@@ -160,7 +161,7 @@ def getCameraFolderName():
 	return cameraId
 
 def getEventsPath():
-	basePath = createFolderIfNotExists('/usr/local/lib/camera')
+	basePath = createFolderIfNotExists('/usr/local/lib/open-automation/camera')
 
 	return createFolderIfNotExists(basePath + '/events')
 
@@ -206,17 +207,22 @@ def localDateToUtc(date):
 	return date + utcOffset;
 
 def saveRecording(data):
-	audioFilePath = getCameraTempPath() + '/' + getFileName(fileTimestamp) + '.wav'
+	audioFile = getFileName(fileTimestamp) + '.wav'
+	audioFilePath = getCameraTempPath() + '/' + audioFile
 	print("Saving audio buffer to file", audioFilePath)
 
-	# stream.stop_stream()
+	stream.stop_stream()
 
 	wf = wave.open(audioFilePath, 'wb')
 	wf.setnchannels(CHANNELS)
 	wf.setsampwidth(audio.get_sample_size(FORMAT))
 	wf.setframerate(RATE)
+	print("tempPath is", data['tempPath'])
+	print("audioFilePath is", audioFilePath)
 	wf.writeframes(b''.join(audioFrames))
 	wf.close()
+
+	# audioFrames = []
 
 	db.camera_recordings.insert_one({
 		'id': str(uuid.uuid4()),
@@ -228,12 +234,14 @@ def saveRecording(data):
 		'height': data['height']
 	})
 
+	subprocess.call(['ffmpeg', '-y', '-i', data['tempPath'], '-i', audioFilePath, '-q:v', '0', data['finishedPath']])
+
 	# move the file from the temporary location
-	os.rename(data['tempPath'], data['finishedPath'])
+	# os.rename(data['tempPath'], data['finishedPath'])
 
 	print('[NEW RECORDING] Recording saved.')
 	sys.stdout.flush()
-	# stream.start_stream()
+	stream.start_stream()
 
 ##################################################################################################################
 # Start MongoDB
@@ -255,7 +263,6 @@ stream = audio.open(format=audio.get_format_from_width(WIDTH),
             channels=CHANNELS,
             rate=RATE,
             input=True,
-            output=True,
             stream_callback=callback)
 
 audioFrames = []
@@ -360,7 +367,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 			tempRecordingPath = getCameraTempPath() + '/' + videoFileName
 			finishedRecordingPath = getDatePath(fileTimestamp) + '/' + videoFileName
 
-			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
+			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'MPEG'), FRAMERATE)
 	else:
 		consecFramesWithMotion = 0
 		consecFramesWithoutMotion += 1
