@@ -45,17 +45,17 @@ MIN_MOTION_FRAMES = 15 # minimum number of consecutive frames with motion requir
 MAX_CATCH_UP_FRAMES = 30 # maximum number of consecutive catch-up frames before forcing evaluation of a new frame
 MAX_CATCH_UP_MAX_REACHED = 10 # script will exit if max catch up frames limit is reached this many times consecutively
 
-AUDIO_BUFFER = 41.7 * BUFFER_TIME
+AUDIO_BUFFER = 40.5 * BUFFER_TIME
 FORMAT = pyaudio.paInt16
 WIDTH = 2
 CHANNELS = 2
-RATE = 44100
 CHUNK = 1024
 
 ##################################################################################################################
 # Parse arguments
 
 ap = argparse.ArgumentParser()
+ap.add_argument('-a', '--audio-device', dest='audio-device', type=str, required=True, help='path to video device interface (e.g. hw:2,0)')
 ap.add_argument('-c', '--camera', dest='camera', type=str, required=True, help='path to video device interface (e.g. /dev/video0)')
 ap.add_argument('-i', '--camera-id', dest='camera-id', type=str, required=True, help='unique id of camera service')
 ap.add_argument('-r', '--rotation', dest='rotation', type=int, required=False, default=0, help='degrees of rotation for the picture - supported values: 0, 180')
@@ -74,6 +74,7 @@ motionArea_x1 = args['motionArea_x1']
 motionArea_y1 = args['motionArea_y1']
 motionArea_x2 = args['motionArea_x2']
 motionArea_y2 = args['motionArea_y2']
+audioDevice = args['audio-device']
 
 ##################################################################################################################
 # Definitions and Classes
@@ -206,6 +207,16 @@ def localDateToUtc(date):
 	utcOffset = datetime.timedelta(seconds=utcOffsetSec)
 	return date + utcOffset;
 
+def getAudioDeviceIndex(audio):
+	index = 0
+	for i in range(audio.get_device_count()):
+		device = str(audio.get_device_info_by_index(i))
+		if audioDevice in device:
+			index = i
+			break
+
+	return index
+
 def saveRecording(data):
 	audioFile = getFileName(fileTimestamp) + '.wav'
 	audioFilePath = getCameraTempPath() + '/' + audioFile
@@ -234,9 +245,8 @@ def saveRecording(data):
 		'height': data['height']
 	})
 
-	subprocess.call(['ffmpeg', '-y', '-i', data['tempPath'], '-i', audioFilePath, '-q:v', '0', data['finishedPath']])
-
-	# move the file from the temporary location
+	# mux audio and move the file from the temporary location
+	subprocess.call(['ffmpeg', '-y', '-loglevel', 'panic', '-i', data['tempPath'], '-i', audioFilePath, '-q:v', '0', data['finishedPath']])
 	# os.rename(data['tempPath'], data['finishedPath'])
 
 	print('[NEW RECORDING] Recording saved.')
@@ -259,10 +269,14 @@ except:
 
 #initialize the audio device and start streaming
 audio = pyaudio.PyAudio()
-stream = audio.open(format=audio.get_format_from_width(WIDTH),
+dev_index = getAudioDeviceIndex(audio)
+RATE = int(audio.get_device_info_by_index(dev_index)['defaultSampleRate'])
+stream = audio.open(
+			format=audio.get_format_from_width(WIDTH),
             channels=CHANNELS,
             rate=RATE,
             input=True,
+			input_device_index = dev_index,
             stream_callback=callback)
 
 audioFrames = []
@@ -288,11 +302,9 @@ kcw = KeyClipWriter(BUFFER_SIZE)
 loopCnt = 0
 audio = pyaudio.PyAudio()
 fileTimestamp = None
-cnt = 0
 
 # keep looping
 for needCatchUpFrame in framerateInterval(FRAMERATE):
-
 	# repeat the last frame if motion detection isn't keeping up with the framerate
 	if needCatchUpFrame and consecCatchUpFrames < MAX_CATCH_UP_FRAMES:
 		consecCatchUpFrames += 1
@@ -367,7 +379,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 			tempRecordingPath = getCameraTempPath() + '/' + videoFileName
 			finishedRecordingPath = getDatePath(fileTimestamp) + '/' + videoFileName
 
-			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'MPEG'), FRAMERATE)
+			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
 	else:
 		consecFramesWithMotion = 0
 		consecFramesWithoutMotion += 1

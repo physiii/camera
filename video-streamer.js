@@ -9,8 +9,10 @@ const spawn = require('child_process').spawn,
 	TAG = '[VideoStreamer]';
 
 let	audioStreamProcess,
+	videoStreamProcess,
 	fileStreamProcess,
-	videoStreamProcess;
+	audioStreamToken = "init_audio_token",
+	videoStreamToken = "init_video_token";
 
 class VideoStreamer {
 	getStreamUrl (streamId, streamToken) {
@@ -23,6 +25,22 @@ class VideoStreamer {
 		}
 	}
 
+	getAudioVideoStreamUrl (streamId) {
+		let audioUrl = config.relay_server + ':' + (config.video_stream_port || defaultStreamPort) + '/' + streamId + '/' + audioStreamToken + '/',
+			videoUrl = config.relay_server + ':' + (config.video_stream_port || defaultStreamPort) + '/' + streamId + '/' + videoStreamToken + '/';
+
+		if (config.use_ssl) {
+			audioUrl = 'https://' + audioUrl;
+			videoUrl = 'https://' + videoUrl;
+		} else {
+			audioUrl = 'http://' + audioUrl;
+			videoUrl = 'https://' + videoUrl;
+		}
+
+		let url = '\"[f=mpegts:select=a]' + audioUrl + '|' + '[f=mpegts:select=v]' + videoUrl + '\"';
+		return url;
+	}
+
 	streamLive (streamId, streamToken, videoDevice, {
 		audioDevice,
 		width = defaultWidth,
@@ -30,6 +48,7 @@ class VideoStreamer {
 		rotation = defaultRotation
 		} = {}) {
 
+		videoStreamToken = streamToken;
 		// ffmpeg -s 1280x720 -r 30 -f v4l2 -i /dev/video10 -f mpegts -vf transpose=2,transpose=1 -codec:a mp2 -ar 44100 -ac 1 -b:a 128k -codec:v mpeg1video -b:v 2000k -strict -1 test.avi
 		let options = [
 			'-f', 'v4l2',
@@ -41,7 +60,7 @@ class VideoStreamer {
 				'-codec:v', 'mpeg1video',
 					'-s', width + 'x' + height,
 					'-b:v', '1000k',
-				'-muxdelay', '0.001',
+			'-q:v', '0',
 			'-strict', '-1',
 			this.getStreamUrl(streamId, streamToken)
 		];
@@ -58,18 +77,20 @@ class VideoStreamer {
 	}
 
 	streamLiveAudio (streamId, streamToken, audioDevice) {
+
+		audioStreamToken = streamToken;
+
 		let options = [
-				'-f', 'alsa',
-					'-ar', '44100',
-					// '-ac', '1',
-					'-i', audioDevice,
-				'-f', 'mpegts',
-					'-codec:a', 'mp2',
-						'-b:a', '128k',
-					'-muxdelay', '0.001',
-				'-strict', '-1',
-				this.getStreamUrl(streamId, streamToken)
-				];
+			'-f', 'alsa',
+				'-ar', '44100',
+				// '-ac', '1',
+				'-i', audioDevice,
+			'-f', 'mpegts',
+				'-codec:a', 'mp2',
+					'-b:a', '128k',
+			'-strict', '-1',
+			this.getStreamUrl(streamId, streamToken)
+			];
 
 		this.printFFmpegOptions(options);
 
@@ -90,7 +111,42 @@ class VideoStreamer {
 
 		console.log("ffmpeg: ", options_str);
 	}
+
+	streamAudioFile (streamId, streamToken, file) {
+
+		audioStreamToken = streamToken;
+
+		let options = [
+			'-re',
+			'-i', file,
+			'-f', 'tee',
+				'-codec:v', 'mpeg1video',
+				'-q:v', '0',
+				'-b:v', '900k',
+				'-codec:a', 'mp2',
+				'-flags', '+global_header',
+				'-b:a', '128k',
+				'-map', '0:a',
+				'-map', '0:v',
+				'-r', '20',
+			this.getAudioVideoStreamUrl(streamId)
+		];
+
+		this.printFFmpegOptions(options);
+
+		// if (fileStreamProcess) fileStreamProcess.kill();
+		//
+		// console.log(TAG, 'Starting file stream stream. Stream ID:', streamId);
+		// fileStreamProcess = spawn('ffmpeg', options);
+		//
+		// fileStreamProcess.on('close', (code) => {
+		// 	console.log(TAG, `File stream exited with code ${code}. Stream ID:`, streamId);
+		// });
+	}
+
 	streamFile (streamId, streamToken, file) {
+
+		videoStreamToken = streamToken;
 
 		let options = [
 			'-re',
@@ -106,13 +162,13 @@ class VideoStreamer {
 		this.printFFmpegOptions(options);
 
 		if (fileStreamProcess) fileStreamProcess.kill();
+
 		console.log(TAG, 'Starting file stream stream. Stream ID:', streamId);
 		fileStreamProcess = spawn('ffmpeg', options);
 
 		fileStreamProcess.on('close', (code) => {
 			console.log(TAG, `File stream exited with code ${code}. Stream ID:`, streamId);
 		});
-
 	}
 
 	streamFiles (streamId, streamToken, files) {
@@ -122,7 +178,7 @@ class VideoStreamer {
 	stop (process) {
 		if (audioStreamProcess) audioStreamProcess.kill();
 		if (videoStreamProcess) videoStreamProcess.kill();
-		if (fileStreamProcess) videoStreamProcess.kill();
+		if (fileStreamProcess) fileStreamProcess.kill();
 	}
 
 	getRotationFromDegrees (degree) {

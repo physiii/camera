@@ -48,6 +48,7 @@ class CameraService extends Service {
 		CameraRecordings.getLastRecording(this.id).then((recording) => this.state.motion_detected_date = recording ? recording.date : null);
 
 		this.setUpLoopback();
+		this.setUpAudioLoopback();
 		if (this.settings.should_detect_motion) {
 			this.startMotionDetection();
 		}
@@ -185,7 +186,7 @@ class CameraService extends Service {
 		VideoStreamer.streamLiveAudio(
 			this.id,
 			stream_token,
-			config.device_hw
+			config.stream_audio_device_path
 		);
 
 		return stream_token;
@@ -211,6 +212,7 @@ class CameraService extends Service {
 			'--motionArea_y1', this.settings.motionArea_y1 || 0,
 			'--motionArea_x2', this.settings.motionArea_x2 || 0,
 			'--motionArea_y2', this.settings.motionArea_y2 || 0,
+			'--audio-device', config.motion_audio_device_path || 0,
 		]);
 
 		// Listen for motion events.
@@ -285,6 +287,59 @@ class CameraService extends Service {
 				}
 			});
 		}, CHECK_SCRIPTS_DELAY);
+	}
+
+	setUpAudioLoopback () {
+		return new Promise((resolve, reject) => {
+			// ffmpeg -f alsa -i hw:2 -f alsa -ar 44100 hw:Loopback -f alsa -ar 44100 hw:Loopback_1
+			const METHOD_TAG = this.TAG + ' [Audio Loopback]',
+				forwardStreamToLoopback = () => {
+
+					let options = [
+						'-loglevel', 'panic',
+						'-f', 'alsa',
+							'-i', config.audio_device_path,
+						'-f', 'alsa',
+							'-ar', '44100',
+							'hw:Loopback',
+						'-f', 'alsa',
+							'-ar', '44100',
+							'hw:Loopback_1',
+						'-f', 'alsa',
+							'-ar', '44100',
+							'hw:Loopback_2'
+					];
+
+					const ffmpegProcess = spawn('ffmpeg', options);
+
+					VideoStreamer.printFFmpegOptions(options);
+					ffmpegProcess.stdout.on('data', (data) => {
+						console.log(METHOD_TAG, data);
+					});
+
+					ffmpegProcess.stderr.on('data', (data) => {
+						console.error(METHOD_TAG, data);
+					});
+
+					ffmpegProcess.on('close', (code) => {
+						console.log(METHOD_TAG, `FFmpeg exited with code ${code}.`);
+					});
+				};
+
+			forwardStreamToLoopback();
+
+			// Every so often, check to make sure video loopback forwarding is still running.
+			this.loopbackInterval = setInterval(() => {
+				utils.checkIfProcessIsRunning('ffmpeg', this.os_device_path, this.getLoopbackDevicePath()).then((isLoopbackRunning) => {
+					if (!isLoopbackRunning) {
+						console.log(METHOD_TAG, 'FFmpeg not running. Re-forwarding stream.');
+
+						forwardStreamToLoopback();
+					}
+				});
+			}, CHECK_SCRIPTS_DELAY);
+			resolve();
+		});
 	}
 
 	dbSerialize () {

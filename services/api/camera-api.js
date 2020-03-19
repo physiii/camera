@@ -57,6 +57,16 @@ class CameraApi extends ServiceApi {
 			});
 		});
 
+		this.on('recording/stream/audio', (data, callback) => {
+			const stream_token = this.service.generateStreamToken();
+
+			CameraRecordings.streamAudioRecording(data.recording_id, stream_token).then(() => {
+				callback(null, {stream_token});
+			}).catch((error) => {
+				callback(error);
+			});
+		});
+
 		this.on('recording/stream/stop', (data, callback) => {
 			CameraRecordings.stopStream(data.recording_id);
 			// TODO: Error handling
