@@ -72,7 +72,7 @@ class CameraRecordings {
 	}
 
 	stopStream (recordingId) {
-		VideoStreamer.stop(recordingId);
+		VideoStreamer.stop();
 	}
 }
 

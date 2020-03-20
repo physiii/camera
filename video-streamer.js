@@ -11,6 +11,8 @@ const spawn = require('child_process').spawn,
 let	audioStreamProcess,
 	videoStreamProcess,
 	fileStreamProcess,
+	audioStreamId,
+	videoStreamId,
 	audioStreamToken = "init_audio_token",
 	videoStreamToken = "init_video_token";
 
@@ -34,10 +36,10 @@ class VideoStreamer {
 			videoUrl = 'https://' + videoUrl;
 		} else {
 			audioUrl = 'http://' + audioUrl;
-			videoUrl = 'https://' + videoUrl;
+			videoUrl = 'http://' + videoUrl;
 		}
 
-		let url = '\"[f=mpegts:select=a]' + audioUrl + '|' + '[f=mpegts:select=v]' + videoUrl + '\"';
+		let url = "\'[f=mpegts:select=v]" + videoUrl + "|" + "[f=mpegts:select=a]" + audioUrl + "\'";
 		return url;
 	}
 
@@ -69,7 +71,7 @@ class VideoStreamer {
 
 		if (videoStreamProcess) videoStreamProcess.kill();
 		console.log(TAG, 'Starting audio stream stream. Stream ID:', streamId);
-		videoStreamProcess = spawn('ffmpeg', options, {shell: true});
+		videoStreamProcess = spawn('ffmpeg', options);
 
 		videoStreamProcess.on('close', (code) => {
 			console.log(TAG, `Audio stream exited with code ${code}. Stream ID:`, streamId);
@@ -95,7 +97,7 @@ class VideoStreamer {
 		this.printFFmpegOptions(options);
 
 		if (audioStreamProcess) audioStreamProcess.kill();
-		console.log(TAG, 'Starting audio stream stream. Stream ID:', streamId);
+		console.log(TAG, 'Starting live audio stream. Stream ID:', streamId);
 		audioStreamProcess = spawn('ffmpeg', options);
 
 		audioStreamProcess.on('close', (code) => {
@@ -103,27 +105,19 @@ class VideoStreamer {
 		});
 	}
 
-	printFFmpegOptions (options) {
-		let options_str = 'ffmpeg';
-		for (let i = 0; i < options.length; i++) {
-			options_str += ' ' + options[i];
-		}
-
-		console.log("ffmpeg: ", options_str);
-	}
-
 	streamAudioFile (streamId, streamToken, file) {
 
 		audioStreamToken = streamToken;
 
 		let options = [
+			'-loglevel', 'panic',
 			'-re',
 			'-i', file,
 			'-f', 'tee',
 				'-codec:v', 'mpeg1video',
 				'-q:v', '0',
 				'-b:v', '900k',
-				'-codec:a', 'mp2',
+				'-c:a', 'mp2',
 				'-flags', '+global_header',
 				'-b:a', '128k',
 				'-map', '0:a',
@@ -132,39 +126,60 @@ class VideoStreamer {
 			this.getAudioVideoStreamUrl(streamId)
 		];
 
-		this.printFFmpegOptions(options);
+		let command = this.printFFmpegOptions(options);
 
-		// if (fileStreamProcess) fileStreamProcess.kill();
-		//
-		// console.log(TAG, 'Starting file stream stream. Stream ID:', streamId);
+		if (fileStreamProcess) fileStreamProcess.kill();
+
+		console.log(TAG, 'Starting audio file stream. Stream ID:', streamId);
+		fileStreamProcess = exec(command);
 		// fileStreamProcess = spawn('ffmpeg', options);
-		//
-		// fileStreamProcess.on('close', (code) => {
-		// 	console.log(TAG, `File stream exited with code ${code}. Stream ID:`, streamId);
-		// });
+
+		fileStreamProcess.on('close', (code) => {
+			console.log(TAG, `File stream exited with code ${code}. Stream ID:`, streamId);
+		});
 	}
 
 	streamFile (streamId, streamToken, file) {
 
 		videoStreamToken = streamToken;
 
+		// let options = [
+		// 	'-re',
+		// 	'-i', file,
+		// 	'-f', 'mpegts',
+		// 	'-codec:v', 'mpeg1video',
+		// 	'-b:v', '1200k',
+		// 	'-strict', '-1',
+		// 	'-q:v', '0',
+		// 	'-an',
+		// 	this.getStreamUrl(streamId, streamToken)
+		// ];
+
 		let options = [
+			'-loglevel', 'panic',
 			'-re',
 			'-i', file,
-			'-f', 'mpegts',
-			'-codec:v', 'mpeg1video',
-			'-b:v', '1200k',
-			'-strict', '-1',
-			'-an',
-			this.getStreamUrl(streamId, streamToken)
+			'-f', 'tee',
+				'-codec:v', 'mpeg1video',
+				'-q:v', '0',
+				'-b:v', '900k',
+				'-c:a', 'mp2',
+				'-flags', '+global_header',
+				'-b:a', '128k',
+				'-map', '0:a',
+				'-map', '0:v',
+				'-r', '20',
+			this.getAudioVideoStreamUrl(streamId)
 		];
 
-		this.printFFmpegOptions(options);
+		let command = this.printFFmpegOptions(options);
 
 		if (fileStreamProcess) fileStreamProcess.kill();
 
-		console.log(TAG, 'Starting file stream stream. Stream ID:', streamId);
-		fileStreamProcess = spawn('ffmpeg', options);
+		console.log(TAG, 'Starting file stream. Stream ID:', streamId);
+		fileStreamProcess = exec(command);
+		// fileStreamProcess = spawn('ffmpeg', options);
+
 
 		fileStreamProcess.on('close', (code) => {
 			console.log(TAG, `File stream exited with code ${code}. Stream ID:`, streamId);
@@ -179,6 +194,14 @@ class VideoStreamer {
 		if (audioStreamProcess) audioStreamProcess.kill();
 		if (videoStreamProcess) videoStreamProcess.kill();
 		if (fileStreamProcess) fileStreamProcess.kill();
+	}
+
+	printFFmpegOptions (options) {
+		let options_str = 'ffmpeg';
+		for (let i = 0; i < options.length; i++) {
+			options_str += ' ' + options[i];
+		}
+		return options_str;
 	}
 
 	getRotationFromDegrees (degree) {
