@@ -4,6 +4,7 @@
 ##################################################################################################################
 # import the necessary packages
 from keyevent.keyclipwriter import KeyClipWriter
+from keyevent.audioclipwriter import AudioClipWriter
 from imutils.video import VideoStream
 import argparse
 import warnings
@@ -38,24 +39,20 @@ ymin = 100
 xmax = xmin + rWidth
 ymax = ymin + rHeight
 
-BUFFER_TIME = 10
+BUFFER_TIME = 5
 FRAMERATE = 20
+AUDIO_FRAMERATE = 6
 BUFFER_SIZE = BUFFER_TIME * FRAMERATE # seconds * framerate
+AUDIO_BUFFER_SIZE = BUFFER_TIME * AUDIO_FRAMERATE # seconds * framerate
 MIN_MOTION_FRAMES = 15 # minimum number of consecutive frames with motion required to trigger motion detection
 MAX_CATCH_UP_FRAMES = 30 # maximum number of consecutive catch-up frames before forcing evaluation of a new frame
 MAX_CATCH_UP_MAX_REACHED = 10 # script will exit if max catch up frames limit is reached this many times consecutively
-
-AUDIO_BUFFER = 40.5 * BUFFER_TIME
-FORMAT = pyaudio.paInt16
-WIDTH = 2
-CHANNELS = 2
-CHUNK = 1024
 
 ##################################################################################################################
 # Parse arguments
 
 ap = argparse.ArgumentParser()
-ap.add_argument('-a', '--audio-device', dest='audio-device', type=str, required=True, help='path to video device interface (e.g. hw:2,0)')
+ap.add_argument('-a', '--audio-device', dest='audio-device', type=str, required=True, help='path to video device interface (e.g. hw:7,1)')
 ap.add_argument('-c', '--camera', dest='camera', type=str, required=True, help='path to video device interface (e.g. /dev/video0)')
 ap.add_argument('-i', '--camera-id', dest='camera-id', type=str, required=True, help='unique id of camera service')
 ap.add_argument('-r', '--rotation', dest='rotation', type=int, required=False, default=0, help='degrees of rotation for the picture - supported values: 0, 180')
@@ -78,13 +75,6 @@ audioDevice = args['audio-device']
 
 ##################################################################################################################
 # Definitions and Classes
-
-def callback(in_data, frame_count, time_info, status):
-	if len(audioFrames) >= AUDIO_BUFFER and not kcw.recording:
-		audioFrames.pop(0)
-
-	audioFrames.append(in_data)
-	return (in_data, pyaudio.paContinue)
 
 def detectMotion(frame, avg):
 	motionDetected = False
@@ -177,6 +167,12 @@ def getCameraPath():
 def getCameraTempPath():
 	return createFolderIfNotExists(getTempPath() + '/' + getCameraFolderName())
 
+def getAudioFilePath():
+	audioFile = getFileName(fileTimestamp) + '.wav'
+	audioFilePath = getCameraTempPath() + '/' + audioFile
+	print("audioFilePath", audioFilePath)
+	return audioFilePath
+
 def getDatePath(date):
 	cameraPath = getCameraPath()
 	yearPath = createFolderIfNotExists(cameraPath + '/' + date.strftime('%Y'))
@@ -207,34 +203,18 @@ def localDateToUtc(date):
 	utcOffset = datetime.timedelta(seconds=utcOffsetSec)
 	return date + utcOffset;
 
-def getAudioDeviceIndex(audio):
-	index = 0
-	for i in range(audio.get_device_count()):
-		device = str(audio.get_device_info_by_index(i))
-		if audioDevice in device:
-			index = i
-			break
 
-	return index
+
+# def saveAudioRecording(data):
+# 	audioFile = getFileName(fileTimestamp) + '.wav'
+# 	audioFilePath = getCameraTempPath() + '/' + audioFile
+# 	print("Saving audio buffer to file", audioFilePath)
+# 	print('[saveAudioRecording] data len', len(data))
+#
+# 	newAudioRecording = True
+# 	print('[NEW AUDIO RECORDING]')
 
 def saveRecording(data):
-	audioFile = getFileName(fileTimestamp) + '.wav'
-	audioFilePath = getCameraTempPath() + '/' + audioFile
-	print("Saving audio buffer to file", audioFilePath)
-
-	stream.stop_stream()
-
-	wf = wave.open(audioFilePath, 'wb')
-	wf.setnchannels(CHANNELS)
-	wf.setsampwidth(audio.get_sample_size(FORMAT))
-	wf.setframerate(RATE)
-	print("tempPath is", data['tempPath'])
-	print("audioFilePath is", audioFilePath)
-	wf.writeframes(b''.join(audioFrames))
-	wf.close()
-
-	# audioFrames = []
-
 	db.camera_recordings.insert_one({
 		'id': str(uuid.uuid4()),
 		'camera_id': cameraId,
@@ -245,13 +225,19 @@ def saveRecording(data):
 		'height': data['height']
 	})
 
+	while acw.recording:
+		print('Waiting on audio clip to finish!')
+
+	audioFile = getAudioFilePath()
+	print('[NEW RECORDING] Recording saved.', audioFile)
 	# mux audio and move the file from the temporary location
-	subprocess.call(['ffmpeg', '-y', '-loglevel', 'panic', '-i', data['tempPath'], '-i', audioFilePath, '-q:v', '0', data['finishedPath']])
+
+	subprocess.call(['ffmpeg', '-y', '-loglevel', 'panic', '-i', data['tempPath'], '-i', audioFile, '-q:v', '0', data['finishedPath']])
 	# os.rename(data['tempPath'], data['finishedPath'])
 
-	print('[NEW RECORDING] Recording saved.')
+	print('[NEW RECORDING] Recording saved.2')
 	sys.stdout.flush()
-	stream.start_stream()
+
 
 ##################################################################################################################
 # Start MongoDB
@@ -267,25 +253,41 @@ except:
 
 ##################################################################################################################
 
-#initialize the audio device and start streaming
-audio = pyaudio.PyAudio()
-dev_index = getAudioDeviceIndex(audio)
-RATE = int(audio.get_device_info_by_index(dev_index)['defaultSampleRate'])
-stream = audio.open(
-			format=audio.get_format_from_width(WIDTH),
-            channels=CHANNELS,
-            rate=RATE,
-            input=True,
-			input_device_index = dev_index,
-            stream_callback=callback)
+# stream = audio.open(
+# 			format=audio.get_format_from_width(WIDTH),
+#             channels=CHANNELS,
+#             rate=RATE,
+#             input=True,
+# 			input_device_index = dev_index)
+#
+# time.sleep(1)
+#
+#
+# print("* recording")
+#
+# frames = []
+#
+# for i in range(0, int(RATE / CHUNK * 10)):
+#     data = stream.read(CHUNK)
+#     frames.append(data)
+#
+# print("* done recording")
+#
+# stream.stop_stream()
+# stream.close()
+# p.terminate()
+#
+# wf = wave.open('/tmp/open-automation/audio_test.wav', 'wb')
+# wf.setnchannels(CHANNELS)
+# wf.setsampwidth(p.get_sample_size(FORMAT))
+# wf.setframerate(RATE)
+# wf.writeframes(b''.join(frames))
+# wf.close()
 
-audioFrames = []
-time.sleep(1)
-stream.start_stream()
 # initialize the video stream and allow the camera sensor to
 # warmup
 camera = VideoStream(src=cameraPath).start()
-time.sleep(1)
+
 
 # initialize key clip writer and the consecutive number of
 # frames that have *not* contained any action
@@ -299,27 +301,28 @@ avg = None
 motionDetected = False
 regionDetect = False
 kcw = KeyClipWriter(BUFFER_SIZE)
+acw = AudioClipWriter(audioDevice, AUDIO_BUFFER_SIZE)
 loopCnt = 0
-audio = pyaudio.PyAudio()
 fileTimestamp = None
-
+newAudioRecording = False
 # keep looping
 for needCatchUpFrame in framerateInterval(FRAMERATE):
 	# repeat the last frame if motion detection isn't keeping up with the framerate
-	if needCatchUpFrame and consecCatchUpFrames < MAX_CATCH_UP_FRAMES:
-		consecCatchUpFrames += 1
-
-		kcw.update(frame)
-
-		if motionDetected:
-			consecFramesWithMotion += 1
-		else:
-			consecFramesWithoutMotion += 1
-
-		if kcw.recording:
-			recordingFramesLength += 1
-
-		continue
+	# if needCatchUpFrame and consecCatchUpFrames < MAX_CATCH_UP_FRAMES:
+	# 	consecCatchUpFrames += 1
+	#
+	# 	kcw.update(frame)
+	#
+	# 	if motionDetected:
+	# 		consecFramesWithMotion += 1
+	# 	else:
+	# 		consecFramesWithoutMotion += 1
+	#
+	# 	if kcw.recording:
+	# 		recordingFramesLength += 1
+	#
+	# 	print("repeat the last frame if motion detection isn't keeping up with the framerate")
+	# 	continue
 
 	# if too many catch-up frames have been needed, force getting a fresh frame from the camera
 	if consecCatchUpFrames >= MAX_CATCH_UP_FRAMES:
@@ -379,7 +382,8 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 			tempRecordingPath = getCameraTempPath() + '/' + videoFileName
 			finishedRecordingPath = getDatePath(fileTimestamp) + '/' + videoFileName
 
-			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'XVID'), FRAMERATE)
+			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'MPEG'), FRAMERATE)
+			acw.start(getAudioFilePath())
 	else:
 		consecFramesWithMotion = 0
 		consecFramesWithoutMotion += 1
@@ -415,11 +419,22 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 			'height': frame.shape[0]
 		}
 
+		recordingAudioData = {
+			'tempPath': tempRecordingPath,
+			'finishedPath': finishedRecordingPath,
+			'date': fileTimestamp,
+			'duration': float(recordingFramesLength + BUFFER_SIZE) / FRAMERATE,
+			'width': frame.shape[1],
+			'height': frame.shape[0]
+		}
+
 		kcw.finish(saveRecording, recordingData)
+		acw.finish()
 
 		# create a new KeyClipWriter. the existing one continues saving the
 		# recording in a separate thread
 		kcw = KeyClipWriter(BUFFER_SIZE)
+		# acw = AudioClipWriter(audioDevice, AUDIO_BUFFER_SIZE)
 
 		recordingFramesLength = 0
 

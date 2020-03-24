@@ -300,13 +300,13 @@ class CameraService extends Service {
 						'-f', 'alsa',
 							'-i', config.audio_device_path,
 						'-f', 'alsa',
-							'-ar', '44100',
+							// '-ar', '44100',
 							'hw:Loopback',
 						'-f', 'alsa',
-							'-ar', '44100',
+							// '-ar', '44100',
 							'hw:Loopback_1',
 						'-f', 'alsa',
-							'-ar', '44100',
+							// '-ar', '44100',
 							'hw:Loopback_2'
 					];
 

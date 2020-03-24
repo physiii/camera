@@ -1,5 +1,6 @@
 const spawn = require('child_process').spawn,
 	exec = require('child_process').exec,
+	execFile = require('child_process').execFile,
 	config = require('./config.json'),
 	utils = require('./utils.js'),
 	defaultStreamPort = 5054,
@@ -39,7 +40,7 @@ class VideoStreamer {
 			videoUrl = 'http://' + videoUrl;
 		}
 
-		let url = "\'[f=mpegts:select=v]" + videoUrl + "|" + "[f=mpegts:select=a]" + audioUrl + "\'";
+		let url =  "[f=mpegts:select=v]" + videoUrl + "|" + "[f=mpegts:select=a]" + audioUrl;
 		return url;
 	}
 
@@ -130,12 +131,11 @@ class VideoStreamer {
 
 		if (fileStreamProcess) fileStreamProcess.kill();
 
-		console.log(TAG, 'Starting audio file stream. Stream ID:', streamId);
-		fileStreamProcess = exec(command);
-		// fileStreamProcess = spawn('ffmpeg', options);
+		console.log(TAG, 'Starting audio/video file stream. Stream ID:', command);
 
+		fileStreamProcess = spawn('ffmpeg', options);
 		fileStreamProcess.on('close', (code) => {
-			console.log(TAG, `File stream exited with code ${code}. Stream ID:`, streamId);
+			console.log(TAG, `Audio/video file stream exited with code ${code}. Stream ID:`, streamId);
 		});
 	}
 
@@ -177,10 +177,9 @@ class VideoStreamer {
 		if (fileStreamProcess) fileStreamProcess.kill();
 
 		console.log(TAG, 'Starting file stream. Stream ID:', streamId);
-		fileStreamProcess = exec(command);
-		// fileStreamProcess = spawn('ffmpeg', options);
+		// fileStreamProcess = exec(command);
 
-
+		fileStreamProcess = spawn('ffmpeg', options);
 		fileStreamProcess.on('close', (code) => {
 			console.log(TAG, `File stream exited with code ${code}. Stream ID:`, streamId);
 		});
@@ -201,6 +200,7 @@ class VideoStreamer {
 		for (let i = 0; i < options.length; i++) {
 			options_str += ' ' + options[i];
 		}
+		// console.log("printFFmpegOptions", options_str);
 		return options_str;
 	}
 
