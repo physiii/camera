@@ -143,18 +143,6 @@ class VideoStreamer {
 
 		videoStreamToken = streamToken;
 
-		// let options = [
-		// 	'-re',
-		// 	'-i', file,
-		// 	'-f', 'mpegts',
-		// 	'-codec:v', 'mpeg1video',
-		// 	'-b:v', '1200k',
-		// 	'-strict', '-1',
-		// 	'-q:v', '0',
-		// 	'-an',
-		// 	this.getStreamUrl(streamId, streamToken)
-		// ];
-
 		let options = [
 			'-loglevel', 'panic',
 			'-re',

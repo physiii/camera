@@ -26,7 +26,6 @@ class AudioClipWriter:
 		self.recording = False
 		self.audioDevice = audioDevice
 		self.finished = False
-		# self.maxRecordedFrames = 50
 
 		#initialize the audio device and start streaming
 		self.CHANNELS = 2
@@ -44,11 +43,6 @@ class AudioClipWriter:
 		                rate=self.RATE,
 		                input=True,
                 		input_device_index=self.index)
-		# time.sleep(1)
-
-
-		# wf.writeframes(b''.join(self.frames))
-		# self.wf.writeframes(b''.join(self.recordedFrames))
 
 		self.audioThread = Thread(target=self.fillAudioBuffer, args=())
 		self.audioThread.setDaemon(True)

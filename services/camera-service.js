@@ -11,7 +11,7 @@ const spawn = require('child_process').spawn,
 	VideoStreamer = require('../video-streamer.js'),
 	CameraRecordings = require('../camera-recordings.js'),
 	motionScriptPath = path.join(__dirname, '/../motion/motion.py'),
-	mediaDir = "/usr/local/lib/camera/",
+	mediaDir = "/usr/local/lib/open-automation/camera/",
 	ONE_DAY_IN_HOURS = 24,
 	ONE_HOUR_IN_MINUTES = 60,
 	ONE_MINUTE_IN_SECONDS = 60,
@@ -100,7 +100,7 @@ class CameraService extends Service {
 			console.log(TAG, 'Current time ('+time+') is outside timelapse window ('+on_time+' to '+off_time+')');
 		}
 
-    		/*this.getCameraImageBrightness().then(function(brightness) {
+		/*this.getCameraImageBrightness().then(function(brightness) {
 			if (brightness > timelapse_brightness_threshold) {
 				exec(command);
 				console.log(TAG, 'Capturing time lapse image:', command);
@@ -300,13 +300,10 @@ class CameraService extends Service {
 						'-f', 'alsa',
 							'-i', config.audio_device_path,
 						'-f', 'alsa',
-							// '-ar', '44100',
 							'hw:Loopback',
 						'-f', 'alsa',
-							// '-ar', '44100',
 							'hw:Loopback_1',
 						'-f', 'alsa',
-							// '-ar', '44100',
 							'hw:Loopback_2'
 					];
 

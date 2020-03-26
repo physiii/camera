@@ -1,5 +1,5 @@
 # USAGE
-# python motion2.py --output output
+# python3 motion.py --output output
 
 ##################################################################################################################
 # import the necessary packages
@@ -39,7 +39,7 @@ ymin = 100
 xmax = xmin + rWidth
 ymax = ymin + rHeight
 
-BUFFER_TIME = 5
+BUFFER_TIME = 30
 FRAMERATE = 20
 AUDIO_FRAMERATE = 6
 BUFFER_SIZE = BUFFER_TIME * FRAMERATE # seconds * framerate
@@ -203,17 +203,6 @@ def localDateToUtc(date):
 	utcOffset = datetime.timedelta(seconds=utcOffsetSec)
 	return date + utcOffset;
 
-
-
-# def saveAudioRecording(data):
-# 	audioFile = getFileName(fileTimestamp) + '.wav'
-# 	audioFilePath = getCameraTempPath() + '/' + audioFile
-# 	print("Saving audio buffer to file", audioFilePath)
-# 	print('[saveAudioRecording] data len', len(data))
-#
-# 	newAudioRecording = True
-# 	print('[NEW AUDIO RECORDING]')
-
 def saveRecording(data):
 	db.camera_recordings.insert_one({
 		'id': str(uuid.uuid4()),
@@ -226,16 +215,17 @@ def saveRecording(data):
 	})
 
 	while acw.recording:
+		time.sleep(1)
 		print('Waiting on audio clip to finish!')
 
 	audioFile = getAudioFilePath()
 	print('[NEW RECORDING] Recording saved.', audioFile)
+
 	# mux audio and move the file from the temporary location
-
 	subprocess.call(['ffmpeg', '-y', '-loglevel', 'panic', '-i', data['tempPath'], '-i', audioFile, '-q:v', '0', data['finishedPath']])
-	# os.rename(data['tempPath'], data['finishedPath'])
+	os.remove(audioFile)
+	os.remove(data['tempPath'])
 
-	print('[NEW RECORDING] Recording saved.2')
 	sys.stdout.flush()
 
 
@@ -253,41 +243,9 @@ except:
 
 ##################################################################################################################
 
-# stream = audio.open(
-# 			format=audio.get_format_from_width(WIDTH),
-#             channels=CHANNELS,
-#             rate=RATE,
-#             input=True,
-# 			input_device_index = dev_index)
-#
-# time.sleep(1)
-#
-#
-# print("* recording")
-#
-# frames = []
-#
-# for i in range(0, int(RATE / CHUNK * 10)):
-#     data = stream.read(CHUNK)
-#     frames.append(data)
-#
-# print("* done recording")
-#
-# stream.stop_stream()
-# stream.close()
-# p.terminate()
-#
-# wf = wave.open('/tmp/open-automation/audio_test.wav', 'wb')
-# wf.setnchannels(CHANNELS)
-# wf.setsampwidth(p.get_sample_size(FORMAT))
-# wf.setframerate(RATE)
-# wf.writeframes(b''.join(frames))
-# wf.close()
-
 # initialize the video stream and allow the camera sensor to
 # warmup
 camera = VideoStream(src=cameraPath).start()
-
 
 # initialize key clip writer and the consecutive number of
 # frames that have *not* contained any action
@@ -434,7 +392,6 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 		# create a new KeyClipWriter. the existing one continues saving the
 		# recording in a separate thread
 		kcw = KeyClipWriter(BUFFER_SIZE)
-		# acw = AudioClipWriter(audioDevice, AUDIO_BUFFER_SIZE)
 
 		recordingFramesLength = 0
 
