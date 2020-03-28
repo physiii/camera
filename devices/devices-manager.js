@@ -37,7 +37,7 @@ class DevicesManager {
 					})
 					.then(() => {
 						if (device) {
-							return device;
+							resolve(device);
 						}
 
 						if (!this.areDeviceDependenciesMet(data)) {
@@ -48,7 +48,7 @@ class DevicesManager {
 						device = new Device(data);
 						this.devices.set(device.id, device);
 
-						return device;
+						resolve(device);
 					})
 				})
 			})
@@ -57,17 +57,16 @@ class DevicesManager {
 
 	createDevice (data) {
 		return new Promise((resolve, reject) => {
-			const device = this.addDevice(data);
+			this.addDevice(data)
+			.then((device) => {
+				if (!device) {
+					reject();
+				}
 
-			if (!device) {
-				reject();
-			}
-
-			if (device.save) {
 				device.save().then(() => {
 					resolve(device);
 				}).catch(reject);
-			}
+			});
 		});
 	}
 
@@ -105,33 +104,35 @@ class DevicesManager {
 
 	loadDevicesFromDb () {
 		return new Promise((resolve, reject) => {
-			database.get_devices().then((dbDevices) => {
+			database.getDevices().then((dbDevices) => {
 				const dependenciesFailCounters = new Map();
 
 				this.devices.clear();
 
 				while (dbDevices.length > 0) {
 					// Get next device in the list.
-					let dbDevice = dbDevices.shift(),
-						device = this.addDevice(dbDevice);
+					let dbDevice = dbDevices.shift();
 
-					// Device's dependencies are not met.
-					if (!device) {
-						let failCount = (dependenciesFailCounters.get(dbDevice.id) || 0) + 1;
+					this.addDevice(dbDevice)
+					.then((device) => {
+						// Device's dependencies are not met.
+						if (!device) {
+							let failCount = (dependenciesFailCounters.get(dbDevice.id) || 0) + 1;
 
-						// Increment this device's dependencies check fail count.
-						dependenciesFailCounters.set(dbDevice.id, failCount);
+							// Increment this device's dependencies check fail count.
+							dependenciesFailCounters.set(dbDevice.id, failCount);
 
-						// Add the device back to the end of the devices array.
-						if (failCount < DEPENDENCY_CHECK_MAX) {
-							dbDevices.push(dbDevice);
-						} else {
-							console.error(TAG, 'Device\'s dependencies were not satisfied after ' + failCount + ' attempts. Device was not loaded (' + dbDevice.id + ').');
+							// Add the device back to the end of the devices array.
+							if (failCount < DEPENDENCY_CHECK_MAX) {
+								dbDevices.push(dbDevice);
+							} else {
+								console.error(TAG, 'Device\'s dependencies were not satisfied after ' + failCount + ' attempts. Device was not loaded (' + dbDevice.id + ').');
+							}
 						}
+					})
 
-						// Move on to the next device in the array.
-						continue;
-					}
+					// Move on to the next device in the array.
+					continue;
 				}
 
 				resolve(this.devices);

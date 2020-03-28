@@ -140,13 +140,13 @@ class Database {
 	});
 	}
 
-	get_devices () {
+	getDevices () {
 	return this.connect((db, resolve, reject) => {
 		db.collection('devices').find().toArray((error, result) => {
 			db.close();
 
 			if (error) {
-				console.error(TAG, 'get_devices', error);
+				console.error(TAG, 'getDevices', error);
 				reject('Database error');
 				return;
 			}
