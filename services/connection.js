@@ -30,11 +30,13 @@ class ConnectionManager {
 	}
 
   connectionLoop() {
-    var self = this;
+		var self = this;
 
     if (config.manage_network === false) return;
 
-    self.getLocalIP().then(function(localIPs) {
+    self.getLocalIP()
+		.then((localIPs) => {
+			self.localIPs = localIPs;
       if (localIPs.length > 0) {
         self.setCurrentAPStatus("connected");
         self.setConnAttempts(0);
@@ -49,7 +51,13 @@ class ConnectionManager {
           })
         }
       }
-    });
+    })
+		.then(() => {
+			self.getPublicIP()
+			.then((public_ip) => {
+				self.public_ip = public_ip;
+			});
+		})
 
     self.scanWifi().then((apScanList) => {
       self.getMode().then((mode) => {
@@ -105,16 +113,20 @@ class ConnectionManager {
   }
 
   getPublicIP() {
-    request.get(
-      'http://pyfi.org/get_ip',
-      function (error, response, data) {
-        if (!error && response.statusCode == 200) {
-          if (error !== null) console.log(error);
-          module.exports.public_ip = data;
-          //console.log("stored public_ip",public_ip);
-      }
-    });
-  }
+		const url = 'http://' + config.relay_server + ':' + config.relay_port + '/get_ip';
+
+		return new Promise(function(resolve, reject) {
+	    request.get(
+	      url,
+	      function (error, response, data) {
+	        if (!error && response.statusCode == 200) {
+	          if (error !== null) console.log(error);
+	          module.exports.public_ip = data;
+						resolve(data);
+	      }
+	    });
+		});
+	}
 
   getMAC() {
     return new Promise(function(resolve, reject) {

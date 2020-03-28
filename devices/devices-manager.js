@@ -1,5 +1,7 @@
 const database = require('../services/database.js'),
-	utils = require('../utils.js'),
+	ConnectionManager = require('../services/connection.js'),
+	Utils = require('../utils.js'),
+	System = require('../services/system.js'),
 	// If a device's dependencies haven't been met after this many attempts to
 	// create the device, it fails. This is also effectively the dependency
 	// tree depth limit.
@@ -12,20 +14,45 @@ class DevicesManager {
 	}
 
 	addDevice (data) {
-		let device = this.getDeviceById(data.id);
+		return new Promise((resolve, reject) => {
+			let device = this.getDeviceById(data.id);
 
-		if (device) {
-			return device;
-		}
+			ConnectionManager.getLocalIP()
+			.then((localIPs) => {
+				let localIpString = '';
+				for (let i = 0; i < localIPs.length; i++) {
+					localIpString += localIPs[i] + ' | ';
+				}
+				if (data.info) data.info.local_ip = localIpString.substring(0,localIpString.length - 3);
+			})
+			.then(() => {
+				ConnectionManager.getPublicIP()
+				.then((public_ip) => {
+					if (data.info) data.info.public_ip = public_ip;
+				})
+				.then(() => {
+					System.softwareInfo()
+					.then((version) => {
+						if (data.info) data.info.firmware_version = version;
+					})
+					.then(() => {
+						if (device) {
+							return device;
+						}
 
-		if (!this.areDeviceDependenciesMet(data)) {
-			return false;
-		}
+						if (!this.areDeviceDependenciesMet(data)) {
+							console.error("Device dependencies are not met!", data);
+							// return false;
+						}
 
-		device = new Device(data);
-		this.devices.set(device.id, device);
+						device = new Device(data);
+						this.devices.set(device.id, device);
 
-		return device;
+						return device;
+					})
+				})
+			})
+		});
 	}
 
 	createDevice (data) {
@@ -36,9 +63,11 @@ class DevicesManager {
 				reject();
 			}
 
-			device.save().then(() => {
-				resolve(device);
-			}).catch(reject);
+			if (device.save) {
+				device.save().then(() => {
+					resolve(device);
+				}).catch(reject);
+			}
 		});
 	}
 
@@ -69,7 +98,7 @@ class DevicesManager {
 	}
 
 	getServicesByType (serviceType) {
-		return utils.flattenArray(this.getDevicesByServiceType(serviceType).map((device) => {
+		return Utils.flattenArray(this.getDevicesByServiceType(serviceType).map((device) => {
 			return device.services.getServicesByType(serviceType);
 		}));
 	}

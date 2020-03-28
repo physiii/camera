@@ -5,7 +5,7 @@
 const exec = require('child_process').exec,
 	spawn = require('child_process').spawn,
 	rimraf = require('rimraf'),
-	TAG = '[utils.js]';
+	TAG = '[Utils]';
 
 // Accepts search strings as arguments and looks for processes that match those
 // search strings.
