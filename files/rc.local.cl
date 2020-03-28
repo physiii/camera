@@ -15,6 +15,7 @@
 
 su pi -c 'pm2 start /home/pi/camera/index.js --name camera'
 modprobe v4l2loopback video_nr=10,20
+modprobe snd-aloop enable=1,1,1 index=4,5,6
 
 
 # Print the IP address
