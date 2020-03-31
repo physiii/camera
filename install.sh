@@ -11,7 +11,7 @@ curl -sL https://deb.nodesource.com/setup_13.x | sudo -E bash -
 
 sudo apt-get install -y \
   sshpass git nodejs mongodb dnsmasq hostapd tmux xdotool libudev-dev \
-  python-pip python-setuptools python-dev python2.7-dev python-opencv \
+  python-pip python-setuptools python3-dev \
   libssl-dev libasound2-dev nmap ffmpeg \
   build-essential cmake pkg-config libjpeg-dev libtiff5-dev \
   libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libfreetype6-dev \
@@ -56,12 +56,17 @@ unzip opencv_contrib.zip
 cd opencv-4.2.0
 mkdir build
 cd build
+-bash: -D: command not found
+pi@open-automation:~ $     -D BUILD_TESTS=OFF \
+>     -D OPENCV_ENABLE_NONFREE=ON \
+>     -D INSTALL_PYTHON_EXAMPLES=OFF \
+>     -D BUILD_EXAMPLES=OFF ..
 
 cmake -D CMAKE_BUILD_TYPE=RELEASE \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
     -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-4.2.0/modules \
-    -D ENABLE_NEON=ON \ # Pi Specific
-    -D ENABLE_VFPV3=ON \ # Pi Specific
+    -D ENABLE_NEON=ON \
+    -D ENABLE_VFPV3=ON \
     -D BUILD_TESTS=OFF \
     -D OPENCV_ENABLE_NONFREE=ON \
     -D INSTALL_PYTHON_EXAMPLES=OFF \
