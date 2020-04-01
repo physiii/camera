@@ -20,7 +20,7 @@ sudo apt-get install -y \
   raspberrypi-kernel-headers libjasper-dev \ # Pi Specific
   #v4l2loopback-dkms v4l2loopback-utils \
 
-sudo pip3 install pymongo==3.0.3 numpy imutils
+sudo pip3 install pymongo==3.0.3 numpy imutils pyaudio
 sudo npm install -g pm2
 
 ##############
