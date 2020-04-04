@@ -20,9 +20,7 @@ sudo apt-get install -y \
   raspberrypi-kernel-headers libjasper-dev \ # Pi Specific
  
  # sudo apt install -y v4l2loopback-dkms v4l2loopback-utils 
-  
-sudo chmod -R 777 /usr/local/lib /etc/wpa_supplicant/wpa_supplicant.conf /etc/hostapd/hostapd.conf
- 
+
 sudo pip3 install pymongo==3.0.3 numpy imutils pyaudio
 sudo npm install -g pm2
 
@@ -98,8 +96,8 @@ sudo chown -R $USER /usr/src
 cd /usr/src
 git clone https://github.com/umlaeute/v4l2loopback
 cd v4l2loopback
-sudo make -j4 KERNELRELEASE=4.19.93-v7l+
-sudo make install KERNELRELEASE=4.19.93-v7l+
+sudo make -j4 KERNELRELEASE=`uname -r`
+sudo make install KERNELRELEASE=`uname -r`
 sudo depmod -a
 sudo modprobe v4l2loopback video_nr=10
 
@@ -111,7 +109,8 @@ cd ${HOME}
 git clone https://github.com/physiii/camera
 cd camera
 npm install
-
+sudo chmod -R 777 /usr/local/lib /etc/wpa_supplicant/wpa_supplicant.conf /etc/hostapd/hostapd.conf
+ 
 #############
 ## startup ##
 #############
