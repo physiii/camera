@@ -18,8 +18,11 @@ sudo apt-get install -y \
   libatlas-base-dev gfortran python3-dev libavcodec-dev libavformat-dev libqtgui4 libqt4-test python3-pip \
   libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0 python-pyaudio \
   raspberrypi-kernel-headers libjasper-dev \ # Pi Specific
-  #v4l2loopback-dkms v4l2loopback-utils \
-
+ 
+ # sudo apt install -y v4l2loopback-dkms v4l2loopback-utils 
+  
+sudo chmod -R 777 /usr/local/lib /etc/wpa_supplicant/wpa_supplicant.conf /etc/hostapd/hostapd.conf
+ 
 sudo pip3 install pymongo==3.0.3 numpy imutils pyaudio
 sudo npm install -g pm2
 
@@ -56,11 +59,6 @@ unzip opencv_contrib.zip
 cd opencv-4.2.0
 mkdir build
 cd build
--bash: -D: command not found
-pi@open-automation:~ $     -D BUILD_TESTS=OFF \
->     -D OPENCV_ENABLE_NONFREE=ON \
->     -D INSTALL_PYTHON_EXAMPLES=OFF \
->     -D BUILD_EXAMPLES=OFF ..
 
 cmake -D CMAKE_BUILD_TYPE=RELEASE \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
@@ -113,7 +111,6 @@ cd ${HOME}
 git clone https://github.com/physiii/camera
 cd camera
 npm install
-sudo chmod -R 777 /usr/local/lib /etc/wpa_supplicant/wpa_supplicant.conf /etc/hostapd/hostapd.conf
 
 #############
 ## startup ##
