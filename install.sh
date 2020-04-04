@@ -17,7 +17,7 @@ sudo apt-get install -y \
   libavcodec-dev libavformat-dev libswscale-dev libv4l-dev libxvidcore-dev libx264-dev libfreetype6-dev \
   libatlas-base-dev gfortran python3-dev libavcodec-dev libavformat-dev libqtgui4 libqt4-test python3-pip \
   libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0 python-pyaudio \
-  raspberrypi-kernel-headers libjasper-dev \ # Pi Specific
+  raspberrypi-kernel-headers libjasper-dev \
  
  # sudo apt install -y v4l2loopback-dkms v4l2loopback-utils 
 
@@ -119,5 +119,5 @@ sudo -i
 sed -i -e 's/exit 0//g' /etc/rc.local
 echo "su pi -c 'pm2 start /home/pi/camera/index.js --name camera'" >> /etc/rc.local
 echo "modprobe snd-aloop enable=1,1,1 index=4,5,6" >> /etc/rc.local
-echo "modprobe v4l2loopback video_nr=10" >> /etc/rc.local
+echo "modprobe v4l2loopback video_nr=20" >> /etc/rc.local
 echo "exit 0" >> /etc/rc.local
