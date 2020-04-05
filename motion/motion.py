@@ -39,8 +39,8 @@ ymin = 100
 xmax = xmin + rWidth
 ymax = ymin + rHeight
 
-BUFFER_TIME = 30
-FRAMERATE = 20
+BUFFER_TIME = 10
+FRAMERATE = 10
 AUDIO_FRAMERATE = 6
 BUFFER_SIZE = BUFFER_TIME * FRAMERATE # seconds * framerate
 AUDIO_BUFFER_SIZE = BUFFER_TIME * AUDIO_FRAMERATE # seconds * framerate
@@ -90,11 +90,14 @@ def detectMotion(frame, avg):
 	if y > 1 and yh > 1 and x > 1 and xh > 1:
 		croppedFrame = frame[y: yh, x: xh].copy()
 	else:
+		print('No detection region found.')
 		croppedFrame = frame
 	# cv2.rectangle(frame, (x, y), (xh, yh), (255,0,0), 2)
 
 	# resize the frame, convert it to grayscale, and blur it
-	gray = cv2.cvtColor(imutils.resize(croppedFrame, width=100), cv2.COLOR_BGR2GRAY)
+	#gray = cv2.cvtColor(imutils.resize(croppedFrame, width=100), cv2.COLOR_BGR2GRAY)
+	grayWidth = int(croppedFrame.shape[1] / 3)
+	gray = cv2.cvtColor(imutils.resize(croppedFrame, width=grayWidth), cv2.COLOR_BGR2GRAY)
 	gray = cv2.GaussianBlur(gray, (21, 21), 0)
 
 	# if the first frame is None, initialize it
@@ -314,13 +317,13 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 	if cameraRotation is 180:
 		frame = imutils.rotate(frame, cameraRotation);
 
-	if (loopCnt >= FRAMERATE):
-		loopCnt = 0
-	else:
-		loopCnt += 1
+	# if (loopCnt >= FRAMERATE):
+	# 	loopCnt = 0
+	# else:
+	# 	loopCnt += 1
 
-
-	if (loopCnt % 4 == 0):
+	loopCnt += 1
+	if (loopCnt % 3 == 0):
 		motionDetected = False
 		motionDetected, avg = detectMotion(frame, avg)
 
@@ -340,7 +343,7 @@ for needCatchUpFrame in framerateInterval(FRAMERATE):
 			tempRecordingPath = getCameraTempPath() + '/' + videoFileName
 			finishedRecordingPath = getDatePath(fileTimestamp) + '/' + videoFileName
 
-			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'MPEG'), FRAMERATE)
+			kcw.start(tempRecordingPath, cv2.VideoWriter_fourcc(*'MJPG'), FRAMERATE)
 			acw.start(getAudioFilePath())
 	else:
 		consecFramesWithMotion = 0

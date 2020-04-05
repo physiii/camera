@@ -15,7 +15,7 @@ const exec = require('child_process').exec,
   CONNECTION_TIMEOUT = config.connection_timeout || 60, //seconds to consider connection timed out
   TAG = "[connection-manager]"
   router_list = [],
-  mac = "";
+  getMacAddress = require('getmac').default;
 
 var LastGoodConnection = Date.now();
 
@@ -23,6 +23,8 @@ class ConnectionManager {
 
   constructor () {
 		this.init = this.init.bind(this);
+		this.MAC = getMacAddress();
+		console.log("MAC Address Is: ", this.MAC);
 	}
 
   init () {
@@ -30,19 +32,22 @@ class ConnectionManager {
 	}
 
   connectionLoop() {
-		var self = this;
 
-    if (config.manage_network === false) return;
+	var self = this;
 
-    self.getLocalIP()
+ 	if (config.manage_network === false) return;
+
+	self.getLocalIP()
 		.then((localIPs) => {
 			self.localIPs = localIPs;
-      if (localIPs.length > 0) {
-        self.setCurrentAPStatus("connected");
-        self.setConnAttempts(0);
-        self.setLastGoodConnection();
-      } else {
-        let difference = Date.now() - LastGoodConnection;
+			let ip = localIPs[0]
+			let firstQuart = ip.substring(0, ip.indexOf('.'))
+ 			if (localIPs.length > 0 && firstQuart != '169') {
+			        self.setCurrentAPStatus("connected");
+			        self.setConnAttempts(0);
+			        self.setLastGoodConnection();
+		      } else {
+			      let difference = Date.now() - LastGoodConnection;
         console.log(TAG,"bad connection, last good:",difference);
         if (difference > CONNECTION_TIMEOUT * 1000) {
           self.setCurrentAPStatus("disconnected");
@@ -130,11 +135,7 @@ class ConnectionManager {
 
   getMAC() {
     return new Promise(function(resolve, reject) {
-      require('getmac').getMac(function(err,macAddress){
-          if (err)  throw err
-          console.log(macAddress) // 77:31:c2:c5:03:10
-          resolve(macAddress);
-      })
+	resolve(this.MAC);
     })
   }
 
@@ -314,8 +315,7 @@ class ConnectionManager {
     let interfaces_ap_path = __dirname + "/../files/interfaces.ap";
     let sysctl_ap_path = __dirname + "/../files/sysctl.conf.ap";
 
-    this.getMAC().then(function(mac_addr) {
-      var cam_id = mac_addr.replace(/:/g,"");
+      var cam_id = this.MAC.replace(/:/g,"");
       cam_id = cam_id.slice(-6);
       let ssid_name = "Camera_"+cam_id;
       console.log(TAG,"ssid set to", ssid_name);
@@ -349,10 +349,7 @@ class ConnectionManager {
       exec("sudo cp "+sysctl_ap_path+" /etc/sysctl.conf", (error, stdout, stderr) => {console.log(stdout)});
       exec("sudo cp "+rc_local_ap_path+" /etc/rc.local", (error, stdout, stderr) => {console.log(stdout)});
       System.reboot(3);
-
-    }, function(err) {
-        console.log(err);
-    })  }
+  }
 
 }
 

@@ -61,7 +61,7 @@ class CameraService extends Service {
 	}
 
 	getLoopbackDevicePath () {
-		return '/dev/video1' + this.getCameraNumber();
+		return '/dev/video2' + this.getCameraNumber();
 	}
 
 	startTimeLapse () {
