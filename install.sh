@@ -21,7 +21,7 @@ sudo apt-get install -y \
 
  # sudo apt install -y v4l2loopback-dkms v4l2loopback-utils
 
-sudo pip3 install pymongo==3.0.3 numpy imutils pyaudio
+sudo pip3 install pymongo==3.0.3 numpy imutils pyaudio s-tui
 sudo npm install -g pm2
 
 ##############
@@ -41,7 +41,7 @@ sudo make install
 
 # may need to increase swap
 # make sure to set it back after
-# /etc/dphys-swapfile
+# sudo nano /etc/dphys-swapfile
 # sudo /etc/init.d/dphys-swapfile stop
 # sudo /etc/init.d/dphys-swapfile start
 
@@ -99,11 +99,15 @@ cd v4l2loopback
 sudo make -j4 KERNELRELEASE=`uname -r`
 sudo make install KERNELRELEASE=`uname -r`
 sudo depmod -a
-sudo modprobe v4l2loopback video_nr=10
+sudo modprobe v4l2loopback video_nr=20
 
 ##############
 ##  camera  ##
 ##############
+
+sudo systemctl unmask hostapd
+sudo systemctl enable hostapd
+sudo systemctl start hostapd
 
 cd ${HOME}
 git clone https://github.com/physiii/camera
