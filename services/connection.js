@@ -41,7 +41,8 @@ class ConnectionManager {
 		.then((localIPs) => {
 			self.localIPs = localIPs;
 			let ip = localIPs[0]
-			let firstQuart = ip.substring(0, ip.indexOf('.'))
+			let firstQuart = '';
+			if (ip) firstQuart = ip.substring(0, ip.indexOf('.'));
  			if (localIPs.length > 0 && firstQuart != '169') {
 							self.setCurrentAPStatus("connected");
 							self.setConnAttempts(0);
